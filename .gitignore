@@ -1,0 +1,46 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+npm-debug.log*
+
+# Turborepo
+.turbo/
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+apps/web/next-env.d.ts
+.vercel/
+
+# TypeScript
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+htmlcov/

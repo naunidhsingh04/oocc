@@ -1,0 +1,124 @@
+/*
+ * OOCC design tokens — docs/PRD.md §6.2.
+ *
+ * Light mode is the default surface; dark mode redefines the same custom
+ * properties under [data-theme="dark"], so components never need `dark:`
+ * variants — they just use `bg-paper`, `text-ink`, etc. and repaint for free.
+ * The theme toggle in apps/web sets `data-theme` on <html> via next-themes.
+ *
+ * Channel-color and text-role hex values are chosen so every combination
+ * clears the docs/PRD.md §9 quality floor (>=4.5:1 for text, >=3:1 for
+ * channel colors, both measured against --panel).
+ */
+
+@theme {
+  /* Color: paper/panel/rule/ink/signal/mutate */
+  --color-paper: #edf0f3;
+  --color-panel: #ffffff;
+  --color-rule: #d2d9e0;
+  --color-ink: #0e1116;
+  --color-ink-soft: #5a6572;
+  --color-signal: #1b4de4;
+  --color-mutate: #d6006e;
+  --color-ok: #0b7a4b;
+  --color-warn: #b45309;
+
+  /* Color: channels — one stable color per traced variable, reused across
+     the editor gutter, variables panel, array bars, and timeline. */
+  --color-ch-1: #1b4de4;
+  --color-ch-2: #d6006e;
+  --color-ch-3: #0b7a4b;
+  --color-ch-4: #b45309;
+  --color-ch-5: #6d28d9;
+  --color-ch-6: #0e7490;
+  --color-ch-7: #be123c;
+  --color-ch-8: #4d7c0f;
+
+  /* Geometry: 3px radius on controls, 0px on panels. */
+  --radius-control: 3px;
+  --radius-panel: 0px;
+
+  /* Spacing base is 4px — this is already Tailwind's default scale unit
+     (--spacing: 0.25rem), so it is not overridden here. */
+
+  /* The one shadow allowed anywhere: floating menus (command palette,
+     tooltips). Everything else uses the 1px --rule hairline, no shadow. */
+  --shadow-menu: 0 1px 2px rgb(14 17 22 / 0.16);
+
+  /* Type. Actual font files are loaded via next/font in apps/web, which
+     assigns these inner --font-<family> variables on <html>; the tokens
+     below are what components reference. */
+  --font-display: var(--font-chivo), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono-label: var(--font-ibm-plex-mono), ui-monospace, "SF Mono", monospace;
+  --font-editor: var(--font-jetbrains-mono), ui-monospace, "SF Mono", monospace;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+  }
+
+  /* docs/PRD.md §9: keyboard operable end-to-end, visible focus rings on --signal. */
+  :focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-signal);
+    color: #ffffff;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Dark mode — first-class second (docs/PRD.md §6.2). Unlayered, so this
+   always wins over the @theme layer regardless of source order. */
+[data-theme="dark"] {
+  --color-paper: #0b0d10;
+  --color-panel: #14171c;
+  --color-rule: #262b33;
+  --color-ink: #edf0f3;
+  --color-ink-soft: #93a0ad;
+  --color-signal: #5b84ff;
+  --color-mutate: #ff4fa0;
+  --color-ok: #2fbe83;
+  --color-warn: #e0922f;
+
+  --color-ch-1: #5b84ff;
+  --color-ch-2: #ff4fa0;
+  --color-ch-3: #2fbe83;
+  --color-ch-4: #e0922f;
+  --color-ch-5: #a78bfa;
+  --color-ch-6: #22d3ee;
+  --color-ch-7: #fb7185;
+  --color-ch-8: #a3e635;
+
+  --shadow-menu: 0 1px 2px rgb(0 0 0 / 0.6);
+}

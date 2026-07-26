@@ -1,0 +1,31 @@
+[project]
+name = "oocc-executor"
+version = "0.1.0"
+description = "OOCC executor — separate sandboxed service, never in the API process. docs/PRD.md §5."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.140.0",
+    "oocc-contracts",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.51.0",
+]
+
+[tool.uv.sources]
+oocc-contracts = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.9.1",
+    "mypy>=2.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]

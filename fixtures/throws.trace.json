@@ -1,0 +1,869 @@
+{
+  "schema_version": "1.0",
+  "run_id": "r_e6a581b2c4d5116c",
+  "language": "python",
+  "source_hash": "sha256:35dc2174f9e8a81a7eb120c85c0a0b697cddc0e9cc9941ce954b1d3600a313c9",
+  "status": "runtime_error",
+  "meta": {
+    "duration_ms": 0.58,
+    "step_count": 14,
+    "truncated": false,
+    "stdin": "",
+    "peak_heap_objects": 3
+  },
+  "steps": [
+    {
+      "i": 0,
+      "event": "line",
+      "line": 1,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 1,
+          "locals": {}
+        }
+      ],
+      "heap": {},
+      "stdout_delta": "",
+      "changed": []
+    },
+    {
+      "i": 1,
+      "event": "line",
+      "line": 7,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 7,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        }
+      },
+      "stdout_delta": "",
+      "changed": [
+        "f0.average_passing_score"
+      ]
+    },
+    {
+      "i": 2,
+      "event": "line",
+      "line": 8,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 8,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "",
+      "changed": [
+        "f0.scores",
+        "o2[0]",
+        "o2[1]",
+        "o2[2]",
+        "o2[3]",
+        "o2[4]"
+      ]
+    },
+    {
+      "i": 3,
+      "event": "line",
+      "line": 10,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 10,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "",
+      "changed": [
+        "f0.passing_threshold"
+      ]
+    },
+    {
+      "i": 4,
+      "event": "stdout",
+      "line": 10,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 10,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "checking scores:",
+      "changed": []
+    },
+    {
+      "i": 5,
+      "event": "stdout",
+      "line": 10,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 10,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": " ",
+      "changed": []
+    },
+    {
+      "i": 6,
+      "event": "stdout",
+      "line": 10,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 10,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "[55, 62, 48, 70, 58]",
+      "changed": []
+    },
+    {
+      "i": 7,
+      "event": "stdout",
+      "line": 10,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 10,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "\n",
+      "changed": []
+    },
+    {
+      "i": 8,
+      "event": "line",
+      "line": 11,
+      "func": "<module>",
+      "depth": 1,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 11,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "",
+      "changed": []
+    },
+    {
+      "i": 9,
+      "event": "call",
+      "line": 1,
+      "func": "average_passing_score",
+      "depth": 2,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 11,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        },
+        {
+          "frame_id": "f1",
+          "func": "average_passing_score",
+          "line": 1,
+          "locals": {
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          },
+          "args": [
+            "scores",
+            "passing_threshold"
+          ],
+          "call_site_line": 11
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "",
+      "changed": [
+        "f1.passing_threshold",
+        "f1.scores"
+      ]
+    },
+    {
+      "i": 10,
+      "event": "line",
+      "line": 2,
+      "func": "average_passing_score",
+      "depth": 2,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 11,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        },
+        {
+          "frame_id": "f1",
+          "func": "average_passing_score",
+          "line": 2,
+          "locals": {
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          },
+          "args": [
+            "scores",
+            "passing_threshold"
+          ],
+          "call_site_line": 11
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        }
+      },
+      "stdout_delta": "",
+      "changed": []
+    },
+    {
+      "i": 11,
+      "event": "line",
+      "line": 3,
+      "func": "average_passing_score",
+      "depth": 2,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 11,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        },
+        {
+          "frame_id": "f1",
+          "func": "average_passing_score",
+          "line": 3,
+          "locals": {
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            },
+            "passing": {
+              "ref": "o3"
+            }
+          },
+          "args": [
+            "scores",
+            "passing_threshold"
+          ],
+          "call_site_line": 11
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        },
+        "o3": {
+          "type": "list",
+          "len": 0,
+          "items": []
+        }
+      },
+      "stdout_delta": "",
+      "changed": [
+        "f1.passing"
+      ]
+    },
+    {
+      "i": 12,
+      "event": "line",
+      "line": 4,
+      "func": "average_passing_score",
+      "depth": 2,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 11,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        },
+        {
+          "frame_id": "f1",
+          "func": "average_passing_score",
+          "line": 4,
+          "locals": {
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            },
+            "passing": {
+              "ref": "o3"
+            },
+            "total": {
+              "val": 0
+            }
+          },
+          "args": [
+            "scores",
+            "passing_threshold"
+          ],
+          "call_site_line": 11
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        },
+        "o3": {
+          "type": "list",
+          "len": 0,
+          "items": []
+        }
+      },
+      "stdout_delta": "",
+      "changed": [
+        "f1.total"
+      ]
+    },
+    {
+      "i": 13,
+      "event": "exception",
+      "line": 4,
+      "func": "average_passing_score",
+      "depth": 2,
+      "stack": [
+        {
+          "frame_id": "f0",
+          "func": "<module>",
+          "line": 11,
+          "locals": {
+            "average_passing_score": {
+              "ref": "o1"
+            },
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            }
+          }
+        },
+        {
+          "frame_id": "f1",
+          "func": "average_passing_score",
+          "line": 4,
+          "locals": {
+            "scores": {
+              "ref": "o2"
+            },
+            "passing_threshold": {
+              "val": 75
+            },
+            "passing": {
+              "ref": "o3"
+            },
+            "total": {
+              "val": 0
+            }
+          },
+          "args": [
+            "scores",
+            "passing_threshold"
+          ],
+          "call_site_line": 11
+        }
+      ],
+      "heap": {
+        "o1": {
+          "type": "function",
+          "name": "average_passing_score",
+          "qualname": "average_passing_score"
+        },
+        "o2": {
+          "type": "list",
+          "len": 5,
+          "items": [
+            {
+              "val": 55
+            },
+            {
+              "val": 62
+            },
+            {
+              "val": 48
+            },
+            {
+              "val": 70
+            },
+            {
+              "val": 58
+            }
+          ]
+        },
+        "o3": {
+          "type": "list",
+          "len": 0,
+          "items": []
+        }
+      },
+      "stdout_delta": "",
+      "changed": []
+    }
+  ],
+  "error": {
+    "type": "ZeroDivisionError",
+    "message": "division by zero",
+    "line": 4,
+    "step": 13,
+    "traceback": [
+      "Traceback (most recent call last):\n",
+      "  File \"<oocc-user>\", line 11, in <module>\n",
+      "  File \"<oocc-user>\", line 4, in average_passing_score\n",
+      "ZeroDivisionError: division by zero\n"
+    ]
+  }
+}

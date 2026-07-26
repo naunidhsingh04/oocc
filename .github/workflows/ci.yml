@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Runs across every pnpm workspace package (apps/web, packages/ui,
+      # packages/contracts/ts) via turbo's dependency graph.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  api:
+    name: api (lint, typecheck, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install
+      - run: uv sync --all-packages
+
+      - run: uv run --package oocc-api ruff check apps/api
+      - run: uv run --package oocc-api ruff format --check apps/api
+      - run: uv run --package oocc-api mypy apps/api/app
+      - run: uv run --package oocc-api pytest apps/api/tests -v
+
+  executor:
+    name: executor (lint, typecheck, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install
+      - run: uv sync --all-packages
+
+      - run: uv run --package oocc-executor ruff check services/executor
+      - run: uv run --package oocc-executor ruff format --check services/executor
+      - run: uv run --package oocc-executor mypy services/executor/app
+      - run: uv run --package oocc-executor pytest services/executor/tests -v
+
+  contracts:
+    name: contracts (staleness gate, fixture validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: pnpm install --frozen-lockfile
+      - run: uv python install
+      - run: uv sync --all-packages
+
+      # Regenerates packages/contracts/{python,ts}/src/generated and fails
+      # if that differs from what's committed — the fastest way to catch
+      # "changed the schema, forgot to regenerate" before it ships.
+      - run: pnpm gen:contracts:check
+
+      - run: uv run --package oocc-contracts ruff check packages/contracts/python/src
+      - run: uv run --package oocc-contracts mypy packages/contracts/python/src
+      # Includes fixture validation: packages/contracts/python/tests/test_fixtures.py
+      # validates all twelve fixtures/*.trace.json against trace.schema.json.
+      - run: uv run --package oocc-contracts pytest packages/contracts/python/tests -v
+      - run: pnpm --filter @oocc/contracts test

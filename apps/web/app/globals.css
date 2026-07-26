@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* Tailwind v4's automatic content detection walks the project from this
+   file but does not follow into node_modules — and @oocc/ui is reached
+   through a pnpm workspace symlink there. Without this, any utility class
+   used only inside packages/ui (not coincidentally also used somewhere in
+   apps/web's own source) compiles to no CSS at all: the className is
+   present in the DOM, but e.g. `fixed`/`z-50` never actually apply. */
+@source "../../../packages/ui/src/**/*.{ts,tsx}";
+
+@import "@oocc/ui/theme.css";

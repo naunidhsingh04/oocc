@@ -1,0 +1,5 @@
+packages:
+  - "apps/*"
+  - "packages/ui"
+  - "packages/contracts"
+  - "packages/contracts/ts"
