@@ -1,6 +1,20 @@
 export { cn } from "./lib/cn";
 
-export * from "./icons";
+export {
+  ChevronDownIcon,
+  CloseIcon,
+  CommandIcon,
+  MoonIcon,
+  PauseIcon,
+  PlayIcon,
+  SearchIcon,
+  SkipToEndIcon,
+  SkipToStartIcon,
+  StepBackIcon,
+  StepForwardIcon,
+  SunIcon,
+  type IconProps,
+} from "./icons";
 
 export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from "./components/Button";
 export { IconButton, type IconButtonProps } from "./components/IconButton";

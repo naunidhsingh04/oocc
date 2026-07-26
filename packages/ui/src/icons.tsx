@@ -71,3 +71,52 @@ export function ChevronDownIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function PlayIcon(props: IconProps) {
+  return (
+    <svg {...base(props)} fill="currentColor" stroke="none">
+      <path d="M4.5 2.8v10.4a.6.6 0 0 0 .92.5l8.2-5.2a.6.6 0 0 0 0-1l-8.2-5.2a.6.6 0 0 0-.92.5Z" />
+    </svg>
+  );
+}
+
+export function PauseIcon(props: IconProps) {
+  return (
+    <svg {...base(props)} fill="currentColor" stroke="none">
+      <rect x="3.5" y="2.5" width="3" height="11" rx="0.5" />
+      <rect x="9.5" y="2.5" width="3" height="11" rx="0.5" />
+    </svg>
+  );
+}
+
+export function StepBackIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 3v10M12.5 3.5 5.5 8l7 4.5v-9Z" />
+    </svg>
+  );
+}
+
+export function StepForwardIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3v10M3.5 3.5l7 4.5-7 4.5v-9Z" />
+    </svg>
+  );
+}
+
+export function SkipToStartIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3.5 3v10M13 3.5 6.5 8l6.5 4.5v-9Z" />
+    </svg>
+  );
+}
+
+export function SkipToEndIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12.5 3v10M3 3.5 9.5 8 3 12.5v-9Z" />
+    </svg>
+  );
+}

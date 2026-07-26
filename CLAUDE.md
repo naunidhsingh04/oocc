@@ -40,6 +40,14 @@ oocc/
 │  └─ ui/                         design tokens + primitives (@oocc/ui)
 ├─ apps/
 │  ├─ web/                        Next.js app — Person A
+│  │  ├─ lib/player/              playback store (Zustand) — see below
+│  │  ├─ lib/fixtures.ts          the 12 fixture names + dev-only loader
+│  │  ├─ lib/panels/              generic, trace-only panel logic (no algorithm knowledge)
+│  │  ├─ components/editor/       CodeMirror 6 wrapper
+│  │  ├─ components/ribbon/       the Trace Ribbon (canvas)
+│  │  ├─ components/panels/       viz panels (array, ... more in Phase 2)
+│  │  ├─ components/workspace/    layout, toolbar, playback bar, keyboard shortcuts
+│  │  └─ app/api/fixtures/        dev-only — 404s in production, see below
 │  └─ api/                        FastAPI app — Person B
 ├─ services/
 │  └─ executor/                   separate container from day one — Person B
@@ -124,6 +132,40 @@ stored, never echoed back. Backend code that touches request headers must
 not cause the key to reach a log record — see
 `apps/api/app/logging.py:bind_sensitive_value` and
 `apps/api/tests/test_logging_redaction.py` for the pattern and its test.
+
+## Phase 1 frontend: player, editor, ribbon, array panel (done)
+
+`apps/web` now has a working workspace at `/`, driven entirely by
+`fixtures/` — no backend dependency yet. Things later phases must respect:
+
+- **`lib/player/getStateAt.ts`** is the only place components read step
+  state from. Nothing else indexes `trace.steps[i]` directly. This is the
+  seam PRD §3.4 calls out — Phase 6's keyframe+JSON-Patch wire format
+  changes what's inside this function and nothing else.
+- **`lib/player/channels.ts`** assigns every variable name a channel (1-8)
+  once, in first-appearance order across the whole trace, at `loadTrace`
+  time. Every panel that shows a variable imports this module rather than
+  computing its own colors — that's what keeps one variable one color
+  everywhere.
+- **`components/ribbon/`** bins ticks into pixel columns once per
+  resize/trace-load (`tickBins.ts`), never per frame — that's what holds
+  60fps on `large_trace_40k`. Loop brackets are detected from the step
+  trace alone (`lib/player/loops.ts`), no digest/AST needed.
+- **`components/panels/ArrayPanel.tsx`** and `lib/panels/arrayDetection.ts`
+  contain zero algorithm-specific logic — no fixture name, no sorting
+  knowledge. It works off `changed` and frame locals generically. Keep it
+  that way; the twelve fixtures are exactly what enforce this from outside.
+- **`app/api/fixtures/`** is a dev-only stand-in for Phase 2's real run API
+  (404s when `NODE_ENV=production`). Don't build on it as if it were a real
+  surface — replace it, don't extend it, when the run API lands.
+- **Full-height layout gotcha**: the app shell root must be `h-dvh`, not
+  `min-h-dvh` — `react-resizable-panels`' `Group` (and anything else using
+  `h-full`) needs a *definite* ancestor height to resolve percentages
+  against; a `min-height`-only root makes every nested `h-full` silently
+  collapse to content size instead of filling the viewport. Every new panel
+  root also needs an explicit height/flex chain down to its content (see
+  `ArrayPanel.tsx`'s `Tabs`/`Panel` classNames) — a plain wrapper `<div>` in
+  the middle breaks the chain even when everything around it is correct.
 
 ## Tests ship with the code they test
 
