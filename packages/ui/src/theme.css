@@ -9,9 +9,19 @@
  * Channel-color and text-role hex values are chosen so every combination
  * clears the docs/PRD.md §9 quality floor (>=4.5:1 for text, >=3:1 for
  * channel colors, both measured against --panel).
+ *
+ * `static` (not plain `@theme`): Tailwind v4 tree-shakes theme variables it
+ * can't detect as "used" by scanning source text for literal utility-class
+ * or `var(--...)` occurrences. Several tokens here — most importantly the
+ * eight channel colors — are only ever referenced via a runtime template
+ * literal (`` `var(--color-ch-${n})` `` in lib/player/channels.ts,
+ * Chip.tsx, the ribbon, the editor gutters, ...), which that scan can't
+ * see. Without `static`, Tailwind silently drops whichever of those aren't
+ * also coincidentally hardcoded as a literal string somewhere else, and a
+ * variable-to-channel color goes missing with no build error — exactly
+ * what happened before this comment was added.
  */
-
-@theme {
+@theme static {
   /* Color: paper/panel/rule/ink/signal/mutate */
   --color-paper: #edf0f3;
   --color-panel: #ffffff;
