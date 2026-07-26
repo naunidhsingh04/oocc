@@ -40,36 +40,43 @@ function resolveChannelForPath(step: Step, path: string, channels: ChannelAssign
  * array plus its own pixel-bucket cache; it never re-walks `trace.steps`.
  */
 export function computeStepTicks(trace: Trace, channels: ChannelAssignment): TickInfo[] {
+  // Indexed by array position (0..trace.steps.length-1), matching
+  // getStateAt's own indexing — NOT by `step.i`, which is the step's true
+  // index in the *original* (possibly truncated) run. A head+tail-sampled
+  // trace like `infinite_loop` (status "step_limit") keeps steps whose
+  // `.i` values jump from ~50 to ~580 with nothing in between; indexing by
+  // `.i` would leave hundreds of holes in this array and desync it from
+  // `trace.steps` itself.
   const ticks: TickInfo[] = new Array(trace.steps.length);
 
-  for (const step of trace.steps) {
+  trace.steps.forEach((step, pos) => {
     const depth = step.depth;
     switch (step.event) {
       case "call":
-        ticks[step.i] = { category: "call", depth };
+        ticks[pos] = { category: "call", depth };
         break;
       case "return":
-        ticks[step.i] = { category: "return", depth };
+        ticks[pos] = { category: "return", depth };
         break;
       case "exception":
-        ticks[step.i] = { category: "exception", depth };
+        ticks[pos] = { category: "exception", depth };
         break;
       case "stdout":
-        ticks[step.i] = { category: "stdout", depth };
+        ticks[pos] = { category: "stdout", depth };
         break;
       case "line": {
         if (step.changed.length === 0) {
-          ticks[step.i] = { category: "comparison", depth };
+          ticks[pos] = { category: "comparison", depth };
         } else {
           const channel = resolveChannelForPath(step, step.changed[0]!, channels);
-          ticks[step.i] = { category: "assignment", channel, depth };
+          ticks[pos] = { category: "assignment", channel, depth };
         }
         break;
       }
       default:
-        ticks[step.i] = { category: "comparison", depth };
+        ticks[pos] = { category: "comparison", depth };
     }
-  }
+  });
 
   return ticks;
 }

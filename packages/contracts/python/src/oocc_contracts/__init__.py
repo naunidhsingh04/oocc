@@ -1,11 +1,25 @@
-"""Pydantic models and validators for the OOCC trace and viz-plan contracts.
+"""Pydantic models and validators for the OOCC trace, viz-plan, and analysis
+contracts.
 
-docs/PRD.md §3.1-3.3 (trace) and §4.3 (viz-plan). The canonical source of
-truth is packages/contracts/{trace,viz-plan}.schema.json — everything in
-oocc_contracts.generated is produced from those files by `pnpm gen:contracts`
-and must never be hand-edited.
+docs/PRD.md §3.1-3.3 (trace), §4.3 (viz-plan and analysis). The canonical
+source of truth is packages/contracts/{trace,viz-plan,analysis}.schema.json
+— everything in oocc_contracts.generated is produced from those files by
+`pnpm gen:contracts` and must never be hand-edited.
 """
 
+from oocc_contracts.generated.analysis_model import (
+    Analysis,
+    ComplexityReport,
+    ComplexitySample,
+    CurveFit,
+    CurveModel,
+    DetectedStructure,
+    InputShape,
+    Insight,
+    InsightKind,
+    Severity,
+    StructureKind,
+)
 from oocc_contracts.generated.trace_model import (
     ChangedPath,
     ExecutionError,
@@ -44,15 +58,22 @@ from oocc_contracts.generated.viz_plan_model import (
 )
 from oocc_contracts.validators import (
     ContractValidationError,
+    validate_analysis,
     validate_trace,
     validate_viz_plan,
 )
 
 __all__ = [
+    "Analysis",
     "Annotation",
     "Binding",
     "ChangedPath",
+    "ComplexityReport",
+    "ComplexitySample",
     "ContractValidationError",
+    "CurveFit",
+    "CurveModel",
+    "DetectedStructure",
     "ExecutionError",
     "Frame",
     "FrameId",
@@ -67,21 +88,27 @@ __all__ = [
     "HeapSet",
     "HeapStr",
     "HeapTuple",
+    "InputShape",
+    "Insight",
+    "InsightKind",
     "Language",
     "Meta",
     "Panel",
     "PanelRole",
     "PanelType",
     "PointerAnnotation",
+    "Severity",
     "Status",
     "Step",
     "StepEvent",
+    "StructureKind",
     "Trace",
     "Value",
     "ValueInline",
     "ValueRef",
     "VizPlan",
     "WindowAnnotation",
+    "validate_analysis",
     "validate_trace",
     "validate_viz_plan",
 ]

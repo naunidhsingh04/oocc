@@ -8,8 +8,7 @@ import json
 from pathlib import Path
 
 import pytest
-
-from oocc_contracts import validate_trace
+from oocc_contracts import validate_analysis, validate_trace, validate_viz_plan
 
 FIXTURES_DIR = Path(__file__).resolve().parents[4] / "fixtures"
 EXPECTED_FIXTURES = {
@@ -70,3 +69,16 @@ def test_every_ok_fixture_is_not_truncated() -> None:
         data = json.loads((FIXTURES_DIR / f"{name}.trace.json").read_text())
         if data["status"] == "ok":
             assert data["meta"]["truncated"] is False, name
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_FIXTURES))
+def test_fixture_analysis_validates_against_analysis_schema(name: str) -> None:
+    data = json.loads((FIXTURES_DIR / f"{name}.analysis.json").read_text())
+    validate_analysis(data)  # raises ContractValidationError on any violation
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_FIXTURES))
+def test_fixture_plan_validates_against_viz_plan_schema_and_is_nonempty(name: str) -> None:
+    data = json.loads((FIXTURES_DIR / f"{name}.plan.json").read_text())
+    validate_viz_plan(data)  # raises ContractValidationError on any violation
+    assert data["panels"], "every fixture must mount at least one panel"

@@ -4,6 +4,7 @@ import { getStateAt, usePlayerStore } from "@/lib/player";
 import { computeArrayView, findPrimaryArrayBinding } from "@/lib/panels/arrayDetection";
 import { Chip, EmptyState, Panel, Tabs, TabsList, TabsTrigger } from "@oocc/ui";
 import { useMemo, useState } from "react";
+import type { VizPanelProps } from "./types";
 
 type ArrayViewMode = "bars" | "cells";
 
@@ -15,13 +16,14 @@ type ArrayViewMode = "bars" | "cells";
  * nothing knows what quicksort or bubble sort is (see
  * lib/panels/arrayDetection.ts).
  */
-export function ArrayPanel() {
+export function ArrayPanel({ panel }: VizPanelProps) {
   const [mode, setMode] = useState<ArrayViewMode>("bars");
   const trace = usePlayerStore((state) => state.trace);
   const channels = usePlayerStore((state) => state.channels);
   const step = usePlayerStore((state) => getStateAt(state.trace, state.currentStep));
 
-  const binding = useMemo(() => (trace ? findPrimaryArrayBinding(trace) : undefined), [trace]);
+  const autoBinding = useMemo(() => (trace ? findPrimaryArrayBinding(trace) : undefined), [trace]);
+  const binding = panel?.binding ?? autoBinding;
   const view = useMemo(() => computeArrayView(step, binding, channels), [step, binding, channels]);
 
   return (

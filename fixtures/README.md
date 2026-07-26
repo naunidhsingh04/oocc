@@ -29,15 +29,23 @@ throwaway tracer in `generator/`, not hand-written JSON:
 exception. That's the point: a truncated or failed run must render exactly
 like a successful one, just with a different `status`.
 
+Since Phase 2, each fixture also has a matching `*.analysis.json`
+(structure_detector + insight_scanner + complexity_analyst output, PRD
+§4.3's `Analysis` shape) and `*.plan.json` (viz_planner's panel plan) —
+the same deterministic pipeline `POST /api/runs` runs at request time, run
+once here so `apps/web` can build panels against real shapes without a
+running API + executor.
+
 ## Regenerating
 
 ```sh
 uv run --package oocc-fixtures-generator python fixtures/generator/run_all.py
+uv run --package oocc-fixtures-generator python fixtures/generator/generate_analysis.py
 ```
 
-This runs each program in `generator/programs/` under `generator/tracer.py`
-(PEP 669 `sys.monitoring`), validates the result against
-`packages/contracts/trace.schema.json`, and overwrites the matching
+`run_all.py` runs each program in `generator/programs/` under
+`generator/tracer.py` (PEP 669 `sys.monitoring`), validates the result
+against `packages/contracts/trace.schema.json`, and overwrites the matching
 `fixtures/*.trace.json`. It refuses to write anything that doesn't validate
 or doesn't match the expected `status` for that fixture.
 
@@ -45,6 +53,12 @@ or doesn't match the expected `status` for that fixture.
 exists only to produce these twelve files. It is **not**
 `services/executor` — Phase 1 builds the real sandboxed tracer from scratch
 against this same contract.
+
+`generate_analysis.py` reads the already-committed `*.trace.json` files and
+runs them through `apps/api`'s real `app.analysis.*` modules (imported
+directly, not over HTTP) to produce `*.analysis.json` and `*.plan.json`.
+Run it after `run_all.py` any time a fixture's trace or a detector's logic
+changes.
 
 ## Testing
 

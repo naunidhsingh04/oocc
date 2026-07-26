@@ -32,6 +32,11 @@ const SCHEMAS = [
     pyModule: "viz_plan_model",
     frozenRootModels: ["PanelRole", "Binding"],
   },
+  {
+    name: "analysis",
+    schemaFile: "analysis.schema.json",
+    pyModule: "analysis_model",
+  },
 ];
 
 const GENERATED_HEADER = `/* eslint-disable */

@@ -549,6 +549,7 @@ version = "0.1.0"
 source = { virtual = "apps/api" }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx2" },
     { name = "oocc-contracts" },
     { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
@@ -556,8 +557,8 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx2" },
     { name = "mypy" },
+    { name = "oocc-executor" },
     { name = "pytest" },
     { name = "ruff" },
 ]
@@ -565,6 +566,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.140.0" },
+    { name = "httpx2", specifier = ">=2.9.1" },
     { name = "oocc-contracts", editable = "packages/contracts/python" },
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.51.0" },
@@ -572,8 +574,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx2", specifier = ">=2.9.1" },
     { name = "mypy", specifier = ">=2.3.0" },
+    { name = "oocc-executor", editable = "services/executor" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.16.0" },
 ]
@@ -614,7 +616,7 @@ dev = [
 [[package]]
 name = "oocc-executor"
 version = "0.1.0"
-source = { virtual = "services/executor" }
+source = { editable = "services/executor" }
 dependencies = [
     { name = "fastapi" },
     { name = "oocc-contracts" },

@@ -1,7 +1,12 @@
 import copy
 
 import pytest
-from oocc_contracts import ContractValidationError, validate_trace, validate_viz_plan
+from oocc_contracts import (
+    ContractValidationError,
+    validate_analysis,
+    validate_trace,
+    validate_viz_plan,
+)
 
 
 def minimal_trace() -> dict:
@@ -99,3 +104,43 @@ def test_accepts_the_known_pointer_and_window_annotation_kinds() -> None:
         }
     )
     assert len(plan.panels[0].annotations) == 2
+
+
+def test_accepts_a_minimal_well_formed_analysis_with_null_complexity() -> None:
+    analysis = validate_analysis(
+        {
+            "structures": [{"kind": "binary_tree", "root_ref": "o5", "confidence": 0.94}],
+            "insights": [{"kind": "off_by_one", "severity": "warning", "step_refs": [12, 13]}],
+            "complexity": None,
+        }
+    )
+    assert analysis.structures[0].kind.value == "binary_tree"
+    assert analysis.complexity is None
+
+
+def test_accepts_a_populated_complexity_report() -> None:
+    analysis = validate_analysis(
+        {
+            "structures": [],
+            "insights": [],
+            "complexity": {
+                "parameter": "arr",
+                "samples": [{"n": 10, "shape": "random", "step_count": 42}],
+                "fits": [{"model": "n", "r_squared": 0.99, "coefficients": {"a": 1, "b": 0}}],
+                "best_fit": "n",
+            },
+        }
+    )
+    assert analysis.complexity is not None
+    assert analysis.complexity.best_fit.value == "n"
+
+
+def test_rejects_a_structure_kind_outside_the_registry() -> None:
+    with pytest.raises(ContractValidationError):
+        validate_analysis(
+            {
+                "structures": [{"kind": "not_a_real_kind", "root_ref": "o1", "confidence": 0.5}],
+                "insights": [],
+                "complexity": None,
+            }
+        )

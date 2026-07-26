@@ -16,10 +16,16 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
+from oocc_contracts.generated.analysis_model import Analysis
 from oocc_contracts.generated.trace_model import Trace
 from oocc_contracts.generated.viz_plan_model import VizPlan
 
-__all__ = ["ContractValidationError", "validate_trace", "validate_viz_plan"]
+__all__ = [
+    "ContractValidationError",
+    "validate_analysis",
+    "validate_trace",
+    "validate_viz_plan",
+]
 
 
 class ContractValidationError(ValueError):
@@ -64,3 +70,12 @@ def validate_viz_plan(data: dict[str, Any]) -> VizPlan:
     """
     _validate("viz-plan.schema.json", data)
     return VizPlan.model_validate(data)
+
+
+def validate_analysis(data: dict[str, Any]) -> Analysis:
+    """Validate a raw analysis payload against analysis.schema.json and parse it.
+
+    Raises ContractValidationError on any schema violation.
+    """
+    _validate("analysis.schema.json", data)
+    return Analysis.model_validate(data)

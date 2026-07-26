@@ -11,5 +11,5 @@ COPY . .
 RUN uv sync --package oocc-executor --frozen
 
 EXPOSE 8001
-CMD ["uv", "run", "--package", "oocc-executor", "uvicorn", "app.main:app", \
+CMD ["uv", "run", "--package", "oocc-executor", "uvicorn", "executor_app.main:app", \
      "--app-dir", "services/executor", "--host", "0.0.0.0", "--port", "8001"]

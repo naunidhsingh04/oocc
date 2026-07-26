@@ -5,6 +5,7 @@ description = "OOCC API — FastAPI app. docs/PRD.md §2."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.140.0",
+    "httpx2>=2.9.1",
     "oocc-contracts",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.51.0",
@@ -12,11 +13,12 @@ dependencies = [
 
 [tool.uv.sources]
 oocc-contracts = { workspace = true }
+oocc-executor = { workspace = true }
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.9.1",
     "mypy>=2.3.0",
+    "oocc-executor",
     "pytest>=9.1.1",
     "ruff>=0.16.0",
 ]

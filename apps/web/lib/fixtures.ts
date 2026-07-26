@@ -1,4 +1,4 @@
-import type { Trace } from "@oocc/contracts";
+import type { Analysis, Trace, VizPlan } from "@oocc/contracts";
 
 /**
  * The twelve committed fixtures (docs/PRD.md §2.2, fixtures/README.md).
@@ -31,14 +31,27 @@ export interface FixtureBundle {
   name: FixtureName;
   trace: Trace;
   source: string;
+  analysis: Analysis;
+  plan: VizPlan;
 }
 
-/** Fetches a fixture's trace + source via the dev-only Next.js route handler. */
+/**
+ * Fetches a fixture's trace + source + analysis + plan via the dev-only
+ * Next.js route handler. This return shape deliberately matches what
+ * `POST /api/runs` returns (apps/api/app/routers/runs.py) — swapping the
+ * transport for the real API later is a one-line change in this function,
+ * not a shape change at every call site.
+ */
 export async function fetchFixture(name: FixtureName): Promise<FixtureBundle> {
   const response = await fetch(`/api/fixtures/${name}`);
   if (!response.ok) {
     throw new Error(`Failed to load fixture "${name}": HTTP ${response.status}`);
   }
-  const data = (await response.json()) as { trace: Trace; source: string };
-  return { name, trace: data.trace, source: data.source };
+  const data = (await response.json()) as {
+    trace: Trace;
+    source: string;
+    analysis: Analysis;
+    plan: VizPlan;
+  };
+  return { name, trace: data.trace, source: data.source, analysis: data.analysis, plan: data.plan };
 }

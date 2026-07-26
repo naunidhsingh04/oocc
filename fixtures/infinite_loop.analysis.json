@@ -1,0 +1,15 @@
+{
+  "structures": [],
+  "insights": [
+    {
+      "kind": "runaway_loop",
+      "severity": "error",
+      "step_refs": [
+        0,
+        600
+      ],
+      "detail": "step/time limit reached without terminating"
+    }
+  ],
+  "complexity": null
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContractValidationError, validateTrace, validateVizPlan } from "./validators";
+import { ContractValidationError, validateAnalysis, validateTrace, validateVizPlan } from "./validators";
 
 function minimalTrace(): unknown {
   return {
@@ -93,5 +93,51 @@ describe("validateVizPlan", () => {
       ],
     });
     expect(plan.panels[0]?.annotations).toHaveLength(2);
+  });
+});
+
+describe("validateAnalysis", () => {
+  it("accepts a minimal, well-formed analysis with null complexity", () => {
+    const analysis = validateAnalysis({
+      structures: [{ kind: "binary_tree", root_ref: "o5", confidence: 0.94 }],
+      insights: [{ kind: "off_by_one", severity: "warning", step_refs: [12, 13] }],
+      complexity: null,
+    });
+    expect(analysis.structures[0]?.kind).toBe("binary_tree");
+    expect(analysis.complexity).toBeNull();
+  });
+
+  it("accepts a populated complexity report", () => {
+    const analysis = validateAnalysis({
+      structures: [],
+      insights: [],
+      complexity: {
+        parameter: "arr",
+        samples: [{ n: 10, shape: "random", step_count: 42 }],
+        fits: [{ model: "n", r_squared: 0.99, coefficients: { a: 1, b: 0 } }],
+        best_fit: "n",
+      },
+    });
+    expect(analysis.complexity?.best_fit).toBe("n");
+  });
+
+  it("rejects an insight with no step_refs entries required by an unknown kind", () => {
+    expect(() =>
+      validateAnalysis({
+        structures: [],
+        insights: [{ kind: "not_a_real_kind", severity: "warning", step_refs: [1] }],
+        complexity: null,
+      }),
+    ).toThrow(ContractValidationError);
+  });
+
+  it("rejects a structure kind outside the registry", () => {
+    expect(() =>
+      validateAnalysis({
+        structures: [{ kind: "not_a_real_kind", root_ref: "o1", confidence: 0.5 }],
+        insights: [],
+        complexity: null,
+      }),
+    ).toThrow(ContractValidationError);
   });
 });

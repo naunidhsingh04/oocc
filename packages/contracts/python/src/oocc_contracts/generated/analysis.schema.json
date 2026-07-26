@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oocc.dev/schemas/analysis.schema.json",
+  "title": "Analysis",
+  "description": "Phase 2 deterministic analysis output — structure detection, insight scanning, and empirical complexity (docs/PRD.md §4.3). Every field here is produced by rule-based or measurement-based code; none of it may ever be filled in by an LLM (CLAUDE.md \"Deterministic means deterministic\"). Narration/explanation text is Phase 3's job and is deliberately absent from this schema. Append-only: see trace.schema.json header for the versioning policy.",
+
+  "$defs": {
+    "StructureKind": {
+      "type": "string",
+      "description": "Detected data-structure shapes. A subset of the panel registry (viz-plan.schema.json PanelType) — the structures structure_detector can actually infer from heap shape and access pattern, as opposed to always-available meta-panels like call_stack or console.",
+      "enum": ["array", "array_2d", "linked_list", "binary_tree", "graph", "stack", "queue", "hash_map"]
+    },
+
+    "DetectedStructure": {
+      "type": "object",
+      "description": "One structure_detector finding, e.g. {kind: \"binary_tree\", root_ref: \"o5\", confidence: 0.94} (PRD §4.3).",
+      "additionalProperties": false,
+      "required": ["kind", "root_ref", "confidence"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/StructureKind" },
+        "root_ref": {
+          "type": "string",
+          "pattern": "^o[0-9]+$",
+          "description": "The heap object this structure is rooted at (a tree's root node, a graph's adjacency container, a stack/queue/array's backing list, ...)."
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "note": {
+          "type": "string",
+          "description": "Optional short, factual (non-narrated) qualifier, e.g. \"ambiguous with linked_list\"."
+        }
+      }
+    },
+
+    "InsightKind": {
+      "type": "string",
+      "description": "The seven deterministic detectors (PRD §4.3 table).",
+      "enum": [
+        "runaway_loop",
+        "off_by_one",
+        "mutation_during_iteration",
+        "accidental_quadratic",
+        "shadowed_builtin",
+        "dead_variable",
+        "redundant_recomputation"
+      ]
+    },
+
+    "Severity": {
+      "type": "string",
+      "enum": ["info", "warning", "error"]
+    },
+
+    "Insight": {
+      "type": "object",
+      "description": "One insight_scanner finding. `detail` is a short factual label (a variable name, a line number) — not narration; Phase 3's narrator turns this into prose.",
+      "additionalProperties": false,
+      "required": ["kind", "severity", "step_refs"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/InsightKind" },
+        "severity": { "$ref": "#/$defs/Severity" },
+        "step_refs": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Real step indices this finding is evidenced by. Never empty — an insight that can't point at a step isn't a finding."
+        },
+        "detail": { "type": "string" }
+      }
+    },
+
+    "CurveModel": {
+      "type": "string",
+      "enum": ["constant", "log_n", "n", "n_log_n", "n_squared", "n_cubed", "exponential"]
+    },
+
+    "InputShape": {
+      "type": "string",
+      "enum": ["random", "sorted", "reverse", "all_equal"]
+    },
+
+    "ComplexitySample": {
+      "type": "object",
+      "description": "One measured (n, shape) execution, counted via the executor's counters-only mode.",
+      "additionalProperties": false,
+      "required": ["n", "shape", "step_count"],
+      "properties": {
+        "n": { "type": "integer", "minimum": 1 },
+        "shape": { "$ref": "#/$defs/InputShape" },
+        "step_count": { "type": "integer", "minimum": 0 },
+        "timed_out": {
+          "type": "boolean",
+          "description": "True if this sample hit the counters-only wall-clock/step cap before completing; excluded from curve fitting."
+        }
+      }
+    },
+
+    "CurveFit": {
+      "type": "object",
+      "description": "One candidate model fit against every non-timed-out sample, via least squares on step_count = a * f(n) + b.",
+      "additionalProperties": false,
+      "required": ["model", "r_squared", "coefficients"],
+      "properties": {
+        "model": { "$ref": "#/$defs/CurveModel" },
+        "r_squared": { "type": "number" },
+        "coefficients": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["a", "b"],
+          "properties": {
+            "a": { "type": "number" },
+            "b": { "type": "number" }
+          }
+        }
+      }
+    },
+
+    "ComplexityReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameter", "samples", "fits", "best_fit"],
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "description": "The size-bearing parameter name found by AST analysis, e.g. \"arr\"."
+        },
+        "samples": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ComplexitySample" }
+        },
+        "fits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CurveFit" }
+        },
+        "best_fit": { "$ref": "#/$defs/CurveModel" }
+      }
+    }
+  },
+
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["structures", "insights"],
+  "properties": {
+    "structures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/DetectedStructure" }
+    },
+    "insights": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Insight" }
+    },
+    "complexity": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/ComplexityReport" }],
+      "description": "Null when the executable's primary size-bearing parameter couldn't be confidently identified (PRD §4.3 doesn't require every program to yield a curve, only that the analysis degrades gracefully)."
+    }
+  }
+}

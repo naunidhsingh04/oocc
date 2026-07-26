@@ -1,5 +1,7 @@
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import type { Analysis } from "./generated/analysis";
+import analysisSchema from "./generated/analysis.schema.json";
 import type { Trace } from "./generated/trace";
 import traceSchema from "./generated/trace.schema.json";
 import type { VizPlan } from "./generated/viz_plan";
@@ -17,6 +19,7 @@ addFormats(ajv);
 
 const validateTraceSchema = ajv.compile<Trace>(traceSchema);
 const validateVizPlanSchema = ajv.compile<VizPlan>(vizPlanSchema);
+const validateAnalysisSchema = ajv.compile<Analysis>(analysisSchema);
 
 export class ContractValidationError extends Error {
   readonly schemaFilename: string;
@@ -53,6 +56,17 @@ export function validateVizPlan(data: unknown): VizPlan {
     throw new ContractValidationError(
       "viz-plan.schema.json",
       (validateVizPlanSchema.errors ?? []).map((e) => `${e.instancePath || "/"} ${e.message ?? ""}`.trim()),
+    );
+  }
+  return data;
+}
+
+/** Validate a raw analysis payload against analysis.schema.json. */
+export function validateAnalysis(data: unknown): Analysis {
+  if (!validateAnalysisSchema(data)) {
+    throw new ContractValidationError(
+      "analysis.schema.json",
+      (validateAnalysisSchema.errors ?? []).map((e) => `${e.instancePath || "/"} ${e.message ?? ""}`.trim()),
     );
   }
   return data;

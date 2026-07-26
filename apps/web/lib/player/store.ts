@@ -1,4 +1,4 @@
-import type { Trace } from "@oocc/contracts";
+import type { Analysis, Trace, VizPlan } from "@oocc/contracts";
 import { create } from "zustand";
 import { buildChannelAssignment, type ChannelAssignment } from "./channels";
 import { getStateAt } from "./getStateAt";
@@ -10,6 +10,10 @@ export interface PlayerState {
   trace: Trace | null;
   sourceCode: string;
   fixtureName: string | null;
+  /** viz_planner's panel plan (PRD §4.3) — null until a run/fixture provides one; the layout engine falls back to a minimal default plan when null (see components/workspace/panelRegistry.ts). */
+  plan: VizPlan | null;
+  /** structure_detector + insight_scanner + complexity_analyst output — null until a run/fixture provides one. */
+  analysis: Analysis | null;
 
   currentStep: number;
   playing: boolean;
@@ -22,7 +26,13 @@ export interface PlayerState {
   loopBrackets: LoopBracket[];
   ticks: TickInfo[];
 
-  loadTrace: (params: { trace: Trace; source: string; name: string }) => void;
+  loadTrace: (params: {
+    trace: Trace;
+    source: string;
+    name: string;
+    plan?: VizPlan | null;
+    analysis?: Analysis | null;
+  }) => void;
   play: () => void;
   pause: () => void;
   togglePlay: () => void;
@@ -49,6 +59,8 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   trace: null,
   sourceCode: "",
   fixtureName: null,
+  plan: null,
+  analysis: null,
 
   currentStep: 0,
   playing: false,
@@ -60,12 +72,14 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   loopBrackets: [],
   ticks: [],
 
-  loadTrace: ({ trace, source, name }) => {
+  loadTrace: ({ trace, source, name, plan = null, analysis = null }) => {
     const channels = buildChannelAssignment(trace);
     set({
       trace,
       sourceCode: source,
       fixtureName: name,
+      plan,
+      analysis,
       currentStep: 0,
       playing: false,
       breakpoints: new Set<number>(),

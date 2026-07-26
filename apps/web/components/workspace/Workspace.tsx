@@ -1,23 +1,32 @@
 "use client";
 
+import { ComplexityPanel } from "@/components/panels/ComplexityPanel";
 import { CodeEditor } from "@/components/editor/CodeEditor";
-import { ArrayPanel } from "@/components/panels/ArrayPanel";
 import { TraceRibbon } from "@/components/ribbon/TraceRibbon";
-import { usePlaybackClock } from "@/lib/player";
+import { usePlaybackClock, usePlayerStore } from "@/lib/player";
 import { ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
 import { useDefaultLayout } from "react-resizable-panels";
+import { PanelGrid } from "./PanelGrid";
 import { PlaybackBar } from "./PlaybackBar";
 import { Toolbar } from "./Toolbar";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
 /**
- * Phase 1's workspace (docs/PRD.md §6.4): editor + array panel in a
- * persisted resizable split, the trace ribbon pinned to the bottom, driven
- * entirely by fixtures — no backend in this phase.
+ * The workspace (docs/PRD.md §6.4): editor + the viz_planner-driven panel
+ * grid in a persisted resizable split, the trace ribbon pinned to the
+ * bottom. Phase 2 replaces Phase 1's single hardcoded ArrayPanel with
+ * `PanelGrid`, the layout engine that mounts panels from a plan.
  */
 export function Workspace() {
   usePlaybackClock();
   useKeyboardShortcuts();
+
+  const plan = usePlayerStore((state) => state.plan);
+  const analysis = usePlayerStore((state) => state.analysis);
+  const fixtureName = usePlayerStore((state) => state.fixtureName);
+  const trace = usePlayerStore((state) => state.trace);
+  const storageKey = fixtureName ?? trace?.source_hash ?? "none";
+  const hasComplexity = !!analysis?.complexity;
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "oocc-workspace-main",
@@ -43,7 +52,19 @@ export function Workspace() {
           </ResizablePane>
           <ResizableHandle />
           <ResizablePane id="panels" defaultSize="45" minSize="20">
-            <ArrayPanel />
+            {hasComplexity ? (
+              <ResizableSplit id="oocc-panels-complexity" orientation="vertical">
+                <ResizablePane id="panel-grid" defaultSize="70" minSize="30">
+                  <PanelGrid plan={plan} storageKey={storageKey} />
+                </ResizablePane>
+                <ResizableHandle />
+                <ResizablePane id="complexity" defaultSize="30" minSize="15">
+                  <ComplexityPanel />
+                </ResizablePane>
+              </ResizableSplit>
+            ) : (
+              <PanelGrid plan={plan} storageKey={storageKey} />
+            )}
           </ResizablePane>
         </ResizableSplit>
       </div>

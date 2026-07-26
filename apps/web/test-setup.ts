@@ -52,6 +52,30 @@ if (typeof globalThis.ResizeObserver === "undefined") {
   };
 }
 
+// This jsdom build has no localStorage at all (window.localStorage is
+// undefined, not just empty) — a plain in-memory stand-in, good enough for
+// anything that only reads/writes/clears its own keys within a test.
+if (typeof window.localStorage === "undefined") {
+  const store = new Map<string, string>();
+  Object.defineProperty(window, "localStorage", {
+    value: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, String(value));
+      },
+      removeItem: (key: string) => {
+        store.delete(key);
+      },
+      clear: () => store.clear(),
+      key: (index: number) => [...store.keys()][index] ?? null,
+      get length() {
+        return store.size;
+      },
+    },
+    writable: true,
+  });
+}
+
 // jsdom has no matchMedia; next-themes' ThemeProvider checks it on mount to
 // resolve the "system" theme.
 if (typeof window.matchMedia === "undefined") {

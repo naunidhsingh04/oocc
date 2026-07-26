@@ -1,0 +1,15 @@
+{
+  "layout": "meta",
+  "panels": [
+    {
+      "id": "p1",
+      "type": "call_stack",
+      "role": "secondary"
+    },
+    {
+      "id": "p2",
+      "type": "variables",
+      "role": "secondary"
+    }
+  ]
+}
