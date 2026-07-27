@@ -18,3 +18,17 @@ export function clampStep(trace: Trace | null, i: number): number {
   if (!trace || trace.steps.length === 0) return 0;
   return Math.min(Math.max(i, 0), trace.steps.length - 1);
 }
+
+/**
+ * Every player action (`jumpTo`, the ribbon's `playheadStep`, ...) takes an
+ * *array position* into `trace.steps`, not a step's own `.i` value — those
+ * differ for a head+tail-truncated trace (see lib/player/ticks.ts's
+ * identical gotcha). AI surfaces (tutor step_refs, insight step_refs) only
+ * ever have real `.i` values, so every one of them must be translated
+ * through this function before being handed to `jumpTo` or the ribbon.
+ */
+export function indexForStepRef(trace: Trace | null, stepRef: number): number | null {
+  if (!trace) return null;
+  const index = trace.steps.findIndex((step) => step.i === stepRef);
+  return index === -1 ? null : index;
+}

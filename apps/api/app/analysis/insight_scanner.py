@@ -199,11 +199,7 @@ def _detect_accidental_quadratic(trace: dict[str, Any], source: str) -> list[dic
             if prev_keys is not None and (len(prev_keys) == 0 or len(keys) == 0):
                 prev_keys = keys
                 continue
-            if (
-                prev_keys is not None
-                and len(keys) == len(prev_keys) + 1
-                and keys[1:] == prev_keys
-            ):
+            if prev_keys is not None and len(keys) == len(prev_keys) + 1 and keys[1:] == prev_keys:
                 findings.append(
                     {
                         "kind": "accidental_quadratic",
@@ -222,17 +218,23 @@ def _detect_accidental_quadratic(trace: dict[str, Any], source: str) -> list[dic
         tree = ast.parse(source)
     except SyntaxError:
         return findings
+
+    set_valued_names = _find_set_valued_names(tree)
     for loop in ast.walk(tree):
         if not isinstance(loop, (ast.For, ast.While)):
             continue
         for node in ast.walk(loop):
             if (
                 isinstance(node, ast.Compare)
-                and any(isinstance(op, ast.In) for op in node.ops)
+                # `not in` is at least as common a membership-check/dedup
+                # pattern as plain `in` (e.g. `if v not in seen:`) and has
+                # the identical O(n)-per-check cost on a list — both count.
+                and any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops)
                 and getattr(node, "lineno", None) is not None
+                and not _compares_against_a_set(node, set_valued_names)
             ):
                 finding = _static_quadratic_finding(
-                    trace, node.lineno, "`in` on a container inside a loop"
+                    trace, node.lineno, "`in`/`not in` on a container inside a loop"
                 )
                 if finding is not None:
                     findings.append(finding)
@@ -250,6 +252,36 @@ def _detect_accidental_quadratic(trace: dict[str, Any], source: str) -> list[dic
                 if finding is not None:
                     findings.append(finding)
     return findings
+
+
+def _find_set_valued_names(tree: ast.AST) -> set[str]:
+    """Names ever assigned a set literal/comprehension or `set(...)` call,
+    module-wide (not scope-aware — a cheap over-approximation, and the
+    right direction to err: skipping a real list-membership bug is better
+    than flagging legitimate O(1) set membership, e.g. bfs_graph's
+    `visited = {start}` then `if neighbor not in visited:`)."""
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        value = node.value
+        is_set_call = (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id == "set"
+        )
+        is_set_valued = isinstance(value, (ast.Set, ast.SetComp)) or is_set_call
+        if not is_set_valued:
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                names.add(target.id)
+    return names
+
+
+def _compares_against_a_set(node: ast.Compare, set_valued_names: set[str]) -> bool:
+    comparator = node.comparators[-1] if node.comparators else None
+    return isinstance(comparator, ast.Name) and comparator.id in set_valued_names
 
 
 def _static_quadratic_finding(trace: dict[str, Any], lineno: int, detail: str) -> dict | None:

@@ -1,5 +1,6 @@
 "use client";
 
+import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { Button, cn, CommandIcon } from "@oocc/ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -44,6 +45,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
         </nav>
       </div>
       <div className="flex items-center gap-1">
+        <SettingsPanel />
         <ThemeToggle />
         <Button variant="secondary" size="sm" onClick={onOpenPalette}>
           <CommandIcon className="h-3.5 w-3.5" />

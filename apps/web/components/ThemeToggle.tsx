@@ -11,7 +11,6 @@ export function ThemeToggle() {
   // next-themes only knows the resolved theme after the client mounts;
   // rendering a neutral placeholder until then avoids a hydration mismatch.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time mount flag, not a render loop.
     setMounted(true);
   }, []);
 

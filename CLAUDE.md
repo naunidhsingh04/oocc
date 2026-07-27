@@ -44,15 +44,30 @@ oocc/
 │  │  ├─ lib/player/              playback store (Zustand) — see below
 │  │  ├─ lib/fixtures.ts          the 12 fixture names + dev-only loader
 │  │  ├─ lib/panels/              generic, trace-only panel logic (no algorithm knowledge)
+│  │  ├─ lib/api/                 the real FastAPI backend client — see Phase 3 frontend below
+│  │  ├─ lib/settings/            provider-key storage + validation (Zustand)
+│  │  ├─ lib/tutor/               tutor transcript/composer state + suggested questions
+│  │  ├─ lib/insights/            insight severity/line-mapping view logic
 │  │  ├─ components/editor/       CodeMirror 6 wrapper
 │  │  ├─ components/ribbon/       the Trace Ribbon (canvas)
+│  │  ├─ components/narration/    labelled segments above the ribbon
+│  │  ├─ components/insights/     the severity-grouped findings list
+│  │  ├─ components/tutor/        the docked tutor panel
+│  │  ├─ components/settings/     the key-setup surface
 │  │  ├─ components/panels/       viz panels (array, ... more in Phase 2)
 │  │  ├─ components/workspace/    layout, toolbar, playback bar, keyboard shortcuts
 │  │  └─ app/api/fixtures/        dev-only — 404s in production, see below
 │  └─ api/                        FastAPI app — Person B
 │     ├─ app/routers/runs.py      POST /api/runs — see Phase 2 backend below
+│     ├─ app/routers/tutor.py     POST /api/tutor (SSE) — see Phase 3 backend below
 │     ├─ app/analysis/            structure_detector, insight_scanner,
 │     │                           complexity_analyst, viz_planner — all deterministic
+│     ├─ app/agents/              the LangGraph pipeline — see Phase 3 backend below
+│     ├─ app/tutor/               tutor context assembly + answer validation
+│     ├─ app/rag/                 concept_chunks store, embeddings, retrieval
+│     ├─ app/security.py          ProviderKey — see Phase 3 backend below
+│     ├─ app/cache.py             deterministic-output cache (source_hash -> 7d TTL)
+│     ├─ evals/                   insight_scanner eval suite (20 known-bug programs)
 │     └─ app/executor_client.py   the only way apps/api ever calls services/executor
 ├─ services/
 │  └─ executor/                   separate container from day one — Person B
@@ -309,6 +324,225 @@ must respect:
   matches `POST /api/runs`'s real response shape — swapping the transport
   for the live API later is a one-line change in `fetchFixture`, not a
   shape change at every call site.
+
+## Phase 3 backend: the LangGraph pipeline, tutor, and BYO key (done)
+
+`POST /api/runs` now runs the full pipeline from `app/agents/graph.py`
+(digest → {structure_detector, insight_scanner, complexity_analyst,
+algorithm_classifier} in parallel → viz_planner → narrator) instead of
+calling each analyzer directly, and `POST /api/tutor` (SSE) answers
+questions grounded in a real trace. Things later phases must respect:
+
+- **The provider key is the load-bearing constraint of this whole phase**
+  (PRD §4.5). `app/security.py`'s `ProviderKey` wraps the raw
+  `X-Provider-Key` header in a Pydantic `SecretStr` immediately, and its
+  FastAPI dependency (`get_provider_key`) calls
+  `app.logging.bind_sensitive_value` on the raw string *before* anything
+  else in that request has a chance to log it — including its own return
+  value. `configure_logging`'s processor order matters: `format_exc_info`
+  must run *before* the redaction processor, or a secret embedded in an
+  exception's own message reaches `JSONRenderer` as a live (unscrubbed)
+  object instead of text — see `app/main.py`'s global
+  `unhandled_exception_handler` and `tests/test_exception_redaction.py`.
+  `tests/test_key_never_leaks.py` runs the entire tutor flow with a
+  sentinel key and greps the log stream, the SSE response body, every
+  prompt actually sent to the (fake) model, and every row in the
+  concept-chunk store — this is the gate; if it doesn't pass, nothing else
+  in this phase matters.
+- **`app/agents/digest.py`** compresses a trace to roughly 2KB: at most 8
+  tracked variables (the same channel-count convention the frontend uses)
+  with at most 40 downsampled samples each, capped loop-skeleton/call-graph/
+  heap-signature/hot-line lists, a 200-char stdout tail. No LLM ever sees a
+  raw trace — every agent node downstream reads this instead. The 2KB
+  ceiling is only *asserted* against `large_trace_40k` (a busy program with
+  many tracked variables can land a bit over — see
+  `tests/agents/test_digest.py`'s comment on this tradeoff), but every
+  sub-extractor's cap is what keeps it that shape at all.
+- **Narration is never merged into a deterministic node's output object.**
+  `Insight`, `ComplexityReport`, and `VizPlan` in
+  `packages/contracts/{analysis,viz-plan}.schema.json` are all
+  `additionalProperties: false` — `Insight`'s own schema docstring already
+  says "Phase 3's narrator turns this into prose" as a *separate* artifact.
+  `insight_narrator.narrate_insights` returns a list of strings *parallel
+  to* `insights`, `complexity_narrator.narrate_complexity` and
+  `viz_narrator.narrate_plan` return their own separate values — never
+  `{**finding, "narration": ...}`. Breaking this rule means
+  `oocc_contracts.validate_analysis` fails on the very next call; this was
+  a real bug caught by `tests/test_runs.py` while building this phase, not
+  a hypothetical.
+- **`app/agents/structure_llm_fallback.py`** only asks the model to
+  confirm/reclassify a `kind` for findings below `LOW_CONFIDENCE_THRESHOLD
+  = 0.75`, capped at `MAX_RECLASSIFICATIONS = 5` per run — it never touches
+  `root_ref`, and a `kind` outside the registry enum is dropped, not
+  passed through. `app/analysis/structure_detector.py` itself still never
+  imports this module or calls a model; the fallback lives entirely
+  downstream, exactly as its own docstring already promised in Phase 2.
+- **`app/agents/algorithm_classifier.py`** validates every `evidence_steps`
+  entry against the trace's real step indices and retries once with a
+  stronger system-prompt suffix on failure; two failed attempts degrade to
+  `None`, never a guess. `app/tutor/tutor.py`'s `answer_question` applies
+  the identical rule to `step_refs`, plus a deterministic (non-LLM)
+  heuristic — `_is_about_the_users_code` — for when an empty `step_refs`
+  is legitimately fine (a general concept question) versus something that
+  must be retried.
+- **`app/routers/tutor.py` is SSE but the model call underneath it isn't
+  streaming.** The retry-on-invalid-`step_refs` rule means the server can't
+  commit to what the client sees until validation has already passed, so
+  `answer_question` runs one (or two) non-streaming structured calls first;
+  only the already-validated final answer gets chunked out over
+  `text/event-stream`. Don't "fix" this into a raw token stream from the
+  model without also solving how a mid-stream response gets un-sent on a
+  failed validation.
+- **Dependencies that touch Postgres or Redis connect lazily, never at
+  dependency-resolution time.** FastAPI resolves every `Depends(...)`
+  before the route body runs, even a branch that will never use it (e.g.
+  no provider key → the tutor never touches the concept store at all) — so
+  `_LazyPostgresConceptStore` (`app/routers/tutor.py`) and
+  `_LazyRedisCache` (`app/redis_client.py`) are constructed synchronously
+  and only open a real connection the first time one of their methods is
+  actually awaited. Skipping this is what broke
+  `test_tutor_without_a_key_emits_a_single_unavailable_event` the first
+  time this was wired up — the dependency tried to reach Postgres before
+  the handler ever got to its own "no key" early return.
+- **`app/cache.py`** caches only the deterministic bundle
+  (`trace`, `structures`, `insights`, `complexity`, `plan`) by
+  `sha256(source + stdin + language)`, 7-day TTL — never
+  `algorithm`/narration, which are LLM outputs tied to whichever key the
+  caller brought (PRD §4.4's "zero LLM calls" is true because the executor
+  run and every deterministic analyzer are skipped on a hit, not because an
+  LLM response is reused across users). `run_pipeline_cached`
+  (`app/agents/graph.py`) branches on the cache instead of the graph
+  itself having a cache-aware node — a hit still runs digest (cheap, pure
+  Python, re-derived from the cached trace) and every LLM-only node fresh.
+- **`capabilities: {tutor, narration}`** on `POST /api/runs`'s response
+  reflects whether *that request* carried a provider key — the frontend
+  should use it to render the tutor/narration UI as a quiet affordance up
+  front (PRD §4.5), not discover degradation by making a request that's
+  going to come back empty.
+- **`app/rag/`**: `concept_store.py`'s `ConceptStore` protocol has two
+  implementations, `PostgresConceptStore` (real, pgvector `<=>` cosine
+  distance) and `InMemoryConceptStore` (fake, cosine similarity in plain
+  Python) — every RAG test runs against the fake, since no live Postgres is
+  reachable in this dev sandbox (unlike `ExecutorClient`, there's no
+  ASGI-transport trick available for a database). `embeddings.py`'s
+  `FakeEmbedder` is a deterministic hash-derived unit vector, good for
+  testing retrieval *mechanics* (top-k ordering, exact-match similarity)
+  but has no notion of real semantic similarity. `seed.py`'s
+  `CURRICULUM_SEED` is deliberately small — one short chunk per concept the
+  twelve fixtures actually demonstrate; it grows in Phase 4. Migrations are
+  one hand-written idempotent SQL file (`migrations/0001_concept_chunks.sql`,
+  applied by `scripts/migrate.py`) — no Alembic for one table.
+- **`evals/`** is a standalone eval suite, not part of `apps/api/app`:
+  twenty programs (`evals/programs/`) each with one deliberately-planted
+  bug matching one of `insight_scanner`'s seven detectors
+  (`evals/manifest.py` labels each). `evals/run_insight_scanner_eval.py`
+  runs them through the *real* `services/executor` tracer (not the
+  throwaway fixtures/generator one) and asserts ≥16/20 correctly flagged
+  plus zero step index ever cited outside the real trace.
+  `tests/evals/test_insight_scanner_eval.py` runs the identical assertions
+  as a normal (fast, fully deterministic) test on every push;
+  `.github/workflows/nightly-evals.yml` runs the standalone script on a
+  schedule for the human-readable report, per the phase brief's explicit
+  "run it in CI nightly." **Gotcha found while building the eval set**:
+  `_detect_accidental_quadratic`'s static check originally matched `in`
+  but not `not in` (identical O(n) cost, equally common — see
+  `if v not in seen:`), and once fixed to match both, produced a false
+  positive on `bfs_graph`'s `if neighbor not in visited:` where `visited`
+  is a `set` (O(1), not a bug) — the fix is `_find_set_valued_names`, a
+  module-wide (not scope-aware, deliberately erring toward under- rather
+  than over-flagging) scan for names assigned a set literal/comprehension
+  or `set(...)` call, excluded from the check.
+
+## Phase 3 frontend: the AI surfaces (done)
+
+`apps/web` now talks to the real FastAPI backend (`lib/api/client.ts`,
+`NEXT_PUBLIC_API_URL`) for everything LLM-touching — the tutor, algorithm
+badge, and narration — while the trace/analysis/plan themselves keep
+coming from the committed fixture (deterministic, byte-stable, no live
+backend required just to look at a run). Things later phases must respect:
+
+- **Every AI surface is additive, never a gate.** `usePlayerStore`'s
+  `algorithm`/`narration`/`capabilities` fields default to null/empty, and
+  `loadRunExtras()` (called automatically after `loadTrace`) is a
+  best-effort fetch that degrades to that same empty state on any
+  failure — no key, no reachable backend, a 500, all look identical to the
+  UI. Nothing about the trace/panels/ribbon/editor depends on this call
+  ever succeeding. `capabilities: {tutor, narration}` on the response
+  tells panels whether to render their quiet "add a key" state up front,
+  instead of discovering it by trying and failing.
+- **Zustand selectors must never return a fresh array/object literal.**
+  `state.analysis?.insights ?? []` looks harmless but creates a new `[]`
+  on every call; `useSyncExternalStore` (what `zustand` is built on)
+  compares snapshots by reference, so this reads as "changed every
+  render" and is an infinite update loop, not a quiet empty state — hit
+  this for real while wiring the insights gutter, composer, and editor
+  selectors to the same `analysis.insights ?? []` pattern. Fixed by
+  `lib/insights/insightsView.ts`'s exported `EMPTY_INSIGHTS` stable
+  reference; the same rule applies to any future selector with a
+  fallback default.
+- **`step_refs` (from the tutor, insights, narration) are real step `.i`
+  values, never array positions** — the same distinction
+  `lib/player/ticks.ts` already had to get right for truncated traces.
+  `lib/player/getStateAt.ts`'s new `indexForStepRef` is the one place
+  that translation happens; `jumpToStepRef` (the player action every
+  step-chip/"show me"/narration-segment click calls) wraps it with the
+  ribbon pulse too, so all three surfaces scrub identically instead of
+  three slightly-different reimplementations.
+- **The tutor's SSE stream is genuinely SSE on the wire, but the model
+  call underneath it isn't token-streamed** — `apps/api/app/routers/tutor.py`
+  runs its retry-on-invalid-`step_refs` logic to completion first, then
+  chunks the validated answer out. `lib/api/client.ts`'s
+  `streamTutorAnswer` parses `data: {...}\n\n` frames by hand (`fetch` +
+  a reader), not `EventSource`, because `EventSource` can't send a POST
+  body or the `X-Provider-Key` header.
+- **Backtick-quoted identifiers are the JetBrains-Mono-plus-channel-color
+  mechanism.** `apps/api/app/tutor/context.py`'s system prompt explicitly
+  asks the model to wrap every variable name/value in backticks;
+  `components/tutor/MessageContent.tsx` parses those spans, looks the
+  identifier up in `channels`, and colors it to match — this is what
+  makes "`mid`" in a tutor sentence read as the same `mid` highlighted in
+  the array panel. If the system prompt's formatting instruction ever
+  changes, this rendering silently stops working (falls back to plain
+  monospace, not a crash, but loses the whole point).
+- **Selecting code in the editor sets a *pending* selection, not an
+  auto-attached chip.** `components/editor/CodeEditor.tsx`'s
+  `EditorView.updateListener` writes to `useTutorStore`'s
+  `pendingSelection` on every selection change; the composer shows a
+  one-click "+ Attach as context" affordance for it. Auto-attaching on
+  every selection would spam the composer with chips from incidental
+  clicking around the editor.
+- **Suggested questions are recomputed from the current step on every
+  scrub** (`lib/tutor/suggestedQuestions.ts`), never cached or hardcoded —
+  they're deliberately cheap, synchronous, and pure (no LLM call) so
+  regenerating on every `currentStep` change is free.
+- **The settings panel validates the key against the real backend**
+  (`POST /api/settings/validate-key`, `apps/api/app/routers/settings.py`),
+  not just a shape check — `lib/settings/providerKey.ts`'s `looksLikeAKey`
+  is only a pre-flight guard against spending a network call on obviously
+  empty input. Session token count accumulates client-side
+  (`useSettingsStore.addTokens`) from every response that reports
+  `tokens_used` (validate-key, tutor's `done` event) — there's no
+  server-side session to track it against yet (no accounts until Phase 5),
+  so it resets on reload by design, not by bug.
+- **Backend resilience added in this phase, not Phase 3 backend's
+  original scope, but required to make any of this testable without a
+  full docker-compose stack**: `app/redis_client.py`'s cache and
+  `app/routers/tutor.py`'s RAG retrieval both catch their own connection
+  errors and degrade (skip caching / empty curriculum context) rather
+  than 500 — a Redis or Postgres outage must never break `POST /api/runs`
+  or the tutor. `GeminiClient`/`FakeLLMClient` also gained
+  `last_usage_tokens`, surfaced through the tutor's `done` event and the
+  validate-key response, for the frontend's session token count.
+- **No live Postgres or a real Gemini key in this dev sandbox** — the
+  done-criterion ("ask 'why does mid keep landing on 4' on binary_search
+  and get a streamed answer whose step chips scrub to steps where the
+  claim is visibly true") was verified against the real executor, real
+  Redis, and the real SSE/validation/retry pipeline end to end, with only
+  the Gemini call itself substituted for a `FakeLLMClient` returning an
+  answer double-checked against the real committed trace (`mid` is `4`
+  at step 8 and only step 8 in that fixture — the fake answer says
+  exactly that, not a made-up claim). Swap in a real key and nothing
+  about the request path changes.
 
 ## Tests ship with the code they test
 

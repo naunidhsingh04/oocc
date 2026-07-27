@@ -64,7 +64,7 @@ jobs:
 
       - run: uv run --package oocc-executor ruff check services/executor
       - run: uv run --package oocc-executor ruff format --check services/executor
-      - run: uv run --package oocc-executor mypy services/executor/app
+      - run: uv run --package oocc-executor mypy services/executor/executor_app
       - run: uv run --package oocc-executor pytest services/executor/tests -v
 
   contracts:

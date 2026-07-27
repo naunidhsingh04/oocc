@@ -12,7 +12,14 @@ target-version = "py312"
 # Generated code (docstrings copied verbatim from JSON Schema descriptions,
 # formatting dictated by datamodel-code-generator) is never hand-edited and
 # never fought over stylistically — see packages/contracts/README.md.
-extend-exclude = ["**/generated/**"]
+extend-exclude = [
+  "**/generated/**",
+  # Deliberately buggy programs for the insight_scanner eval suite —
+  # fixture data, not code this repo ships. Same reasoning as
+  # fixtures/generator/programs being outside every package's own lint
+  # scope.
+  "apps/api/evals/programs/**",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

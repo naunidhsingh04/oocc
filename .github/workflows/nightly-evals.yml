@@ -1,0 +1,29 @@
+name: Nightly evals
+
+on:
+  schedule:
+    # 09:00 UTC every day.
+    - cron: "0 9 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  insight-scanner-eval:
+    name: insight_scanner eval (20 known-bug programs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv python install
+      - run: uv sync --all-packages
+
+      # docs/PRD.md Phase 3 backend brief, eval item: >=16/20 programs
+      # correctly flagged, and no finding ever cites a step index absent
+      # from the trace. apps/api/tests/evals/ runs the same assertions on
+      # every regular push already — this job exists for the
+      # human-readable pass/fail report on a schedule, per the brief's own
+      # "run it in CI nightly" instruction.
+      - run: uv run --package oocc-api python apps/api/evals/run_insight_scanner_eval.py

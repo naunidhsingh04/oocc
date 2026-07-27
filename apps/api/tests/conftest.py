@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import httpx2 as httpx
 import pytest
+from app.cache import InMemoryCache
 from app.executor_client import ExecutorClient
 from executor_app.main import app as real_executor_app
 
@@ -28,3 +29,11 @@ def executor_client() -> ExecutorClient:
         base_url="http://executor.test",
         transport=httpx.ASGITransport(app=real_executor_app),
     )
+
+
+@pytest.fixture
+def cache() -> InMemoryCache:
+    """No real Redis in tests — see app/redis_client.py's lazy-connect
+    docstring for why the default dependency would otherwise try to reach
+    one on the very first cache lookup."""
+    return InMemoryCache()

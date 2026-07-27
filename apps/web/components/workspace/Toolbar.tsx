@@ -2,6 +2,7 @@
 
 import { usePlayerStore } from "@/lib/player";
 import { Button, Chip } from "@oocc/ui";
+import { AlgorithmBadge } from "./AlgorithmBadge";
 import { FixturePicker } from "./FixturePicker";
 import { StdinDrawer } from "./StdinDrawer";
 
@@ -40,6 +41,7 @@ export function Toolbar() {
           </span>
         )}
         {status && status !== "ok" ? <Chip tone={STATUS_TONE[status]}>{status}</Chip> : null}
+        <AlgorithmBadge />
       </div>
       <div className="flex items-center gap-2">
         <StdinDrawer />

@@ -13,11 +13,14 @@ import os
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.logging import bind_sensitive_value, configure_logging
 from app.routers.runs import router as runs_router
+from app.routers.settings import router as settings_router
+from app.routers.tutor import router as tutor_router
 
 configure_logging()
 logger = structlog.get_logger("oocc.api")
@@ -61,7 +64,21 @@ async def log_requests(request: Request, call_next: RequestResponseEndpoint) -> 
     return response
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    # docs/PRD.md §4.5: never include the provider key in an error
+    # response, including via a leaked traceback. `logger.exception` goes
+    # through the same redaction pipeline as every other log call (see
+    # app/logging.py's format_exc_info -> redact ordering); the response
+    # body never contains exception internals at all, generic message
+    # only, so there's no second surface to scrub.
+    logger.exception("request.unhandled_exception", path=request.url.path)
+    return JSONResponse(status_code=500, content={"error": "internal_error"})
+
+
 app.include_router(runs_router)
+app.include_router(tutor_router)
+app.include_router(settings_router)
 
 
 @app.get("/health")

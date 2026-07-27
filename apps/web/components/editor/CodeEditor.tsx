@@ -4,9 +4,12 @@ import { python } from "@codemirror/lang-python";
 import { EditorState, type StateEffect } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import { getStateAt, usePlayerStore } from "@/lib/player";
+import { computeInsightsByLine, EMPTY_INSIGHTS } from "@/lib/insights/insightsView";
+import { useTutorStore } from "@/lib/tutor/store";
 import { useEffect, useMemo, useRef } from "react";
 import { breakpointGutter } from "./breakpointGutter";
 import { channelDotsGutter } from "./channelDotsGutter";
+import { insightGutter, onInsightGutterClickFacet, setInsightLinesEffect } from "./insightGutter";
 import {
   currentLineField,
   onToggleBreakpointFacet,
@@ -42,11 +45,25 @@ export function CodeEditor({ className }: CodeEditorProps) {
   const breakpoints = usePlayerStore((state) => state.breakpoints);
   const channels = usePlayerStore((state) => state.channels);
   const toggleBreakpoint = usePlayerStore((state) => state.toggleBreakpoint);
+  const jumpToStepRef = usePlayerStore((state) => state.jumpToStepRef);
+  const trace = usePlayerStore((state) => state.trace);
+  const insights = usePlayerStore((state) => state.analysis?.insights ?? EMPTY_INSIGHTS);
+
+  const insightsByLine = useMemo(
+    () => (trace ? computeInsightsByLine(trace, insights) : new Map()),
+    [trace, insights],
+  );
 
   const dots = useMemo(() => {
     if (!topFrameLocalNames) return [];
     return topFrameLocalNames.split(",").map((name) => ({ name, channel: channels.get(name) ?? 1 }));
   }, [topFrameLocalNames, channels]);
+
+  // A ref, not a dependency the mount effect reconfigures on: the click
+  // handler is registered once at mount (see the facet below) and always
+  // reads the latest map through this instead.
+  const insightsByLineRef = useRef(insightsByLine);
+  insightsByLineRef.current = insightsByLine;
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -58,6 +75,7 @@ export function CodeEditor({ className }: CodeEditorProps) {
           lineNumbers(),
           breakpointGutter(),
           channelDotsGutter(),
+          insightGutter(),
           currentLineField,
           python(),
           ooccSyntaxHighlighting,
@@ -65,6 +83,24 @@ export function CodeEditor({ className }: CodeEditorProps) {
           EditorView.editable.of(false),
           EditorState.readOnly.of(true),
           onToggleBreakpointFacet.of((line) => toggleBreakpoint(line)),
+          onInsightGutterClickFacet.of((line) => {
+            const insightsHere = insightsByLineRef.current.get(line);
+            const firstStepRef = insightsHere?.[0]?.step_refs[0];
+            if (firstStepRef !== undefined) jumpToStepRef(firstStepRef);
+          }),
+          EditorView.updateListener.of((update) => {
+            if (!update.selectionSet) return;
+            const { from, to } = update.state.selection.main;
+            if (from === to) {
+              useTutorStore.getState().setPendingSelection(null);
+              return;
+            }
+            const code = update.state.sliceDoc(from, to);
+            const startLine = update.state.doc.lineAt(from).number;
+            const endLine = update.state.doc.lineAt(to).number;
+            const label = startLine === endLine ? `line ${startLine}` : `lines ${startLine}-${endLine}`;
+            useTutorStore.getState().setPendingSelection({ label, code });
+          }),
         ],
       }),
     });
@@ -103,6 +139,10 @@ export function CodeEditor({ className }: CodeEditorProps) {
   useEffect(() => {
     viewRef.current?.dispatch({ effects: setChannelDotsEffect.of({ line: currentLine, dots }) });
   }, [currentLine, dots]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: setInsightLinesEffect.of(insightsByLine) });
+  }, [insightsByLine]);
 
   return <div ref={hostRef} className={className} data-testid="code-editor" />;
 }

@@ -70,6 +70,17 @@ export const ooccEditorTheme: Extension = EditorView.theme(
       height: "5px",
       borderRadius: "50%",
     },
+    ".cm-oocc-insight-gutter": {
+      width: "10px",
+      cursor: "pointer",
+    },
+    ".cm-oocc-insight-dot": {
+      display: "block",
+      width: "6px",
+      height: "6px",
+      margin: "6px 2px",
+      borderRadius: "50%",
+    },
   },
   { dark: false },
 );

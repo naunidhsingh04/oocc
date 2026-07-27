@@ -1,10 +1,20 @@
 import type { Analysis, Trace, VizPlan } from "@oocc/contracts";
 import { create } from "zustand";
+import { fetchRunExtras } from "@/lib/api/client";
+import type { AlgorithmResult, Capabilities, RunNarration } from "@/lib/api/types";
+import { useSettingsStore } from "@/lib/settings/store";
 import { buildChannelAssignment, type ChannelAssignment } from "./channels";
-import { getStateAt } from "./getStateAt";
+import { getStateAt, indexForStepRef } from "./getStateAt";
 import { computeLoopBrackets, type LoopBracket } from "./loops";
 import { computeStepTicks, type TickInfo } from "./ticks";
 import { SPEED_STEPS, type LoopScope } from "./types";
+
+const EMPTY_NARRATION: RunNarration = {
+  insights: [],
+  complexity: null,
+  plan_summary: null,
+  step_ranges: [],
+};
 
 export interface PlayerState {
   trace: Trace | null;
@@ -14,6 +24,22 @@ export interface PlayerState {
   plan: VizPlan | null;
   /** structure_detector + insight_scanner + complexity_analyst output — null until a run/fixture provides one. */
   analysis: Analysis | null;
+  /** algorithm_classifier's result (Phase 3, LLM-only) — null with no
+   * provider key or before the live backend has answered. */
+  algorithm: AlgorithmResult | null;
+  /** narrator + per-node narration (Phase 3, LLM-only) — always present as
+   * an object, every field inside empty/null until a live backend answers. */
+  narration: RunNarration;
+  /** Whether the live backend actually had a provider key on the last
+   * `loadRunExtras` call — lets the UI show a quiet "no key" state instead
+   * of an empty-looking one. */
+  capabilities: Capabilities;
+  loadingRunExtras: boolean;
+  /** The step array-position an AI surface (tutor chip, insight "show me",
+   * narration segment) most recently scrubbed to — the ribbon reads this to
+   * draw a brief pulse there, then it self-clears. Not step.i — already
+   * translated (see `jumpToStepRef`). */
+  pulseStep: number | null;
 
   currentStep: number;
   playing: boolean;
@@ -40,6 +66,11 @@ export interface PlayerState {
   stepBackward: () => void;
   jumpBy: (delta: number) => void;
   jumpTo: (index: number) => void;
+  /** Translates a real step `.i` value (what every AI surface's
+   * `step_refs` carries) to an array position, jumps there, and pulses the
+   * ribbon — the one action every "show me"/step-chip/narration-segment
+   * click should call, so they all behave identically. */
+  jumpToStepRef: (stepRef: number) => void;
   jumpToStart: () => void;
   jumpToEnd: () => void;
   setSpeed: (speed: number) => void;
@@ -48,6 +79,11 @@ export interface PlayerState {
   setLoopScope: (scope: LoopScope | null) => void;
   /** Advances up to `n` steps, honoring loop scope, breakpoints, and end-of-trace. Called by the rAF driver only. */
   advanceBy: (n: number) => void;
+  /** Best-effort call to the live backend for the LLM-only fields
+   * (algorithm/narration/capabilities) — never blocks or replaces the
+   * trace/analysis/plan already loaded from the fixture. Safe to call
+   * with no provider key; degrades to the empty/no-capability state. */
+  loadRunExtras: () => Promise<void>;
 }
 
 function clamp(i: number, max: number): number {
@@ -61,6 +97,11 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
   fixtureName: null,
   plan: null,
   analysis: null,
+  algorithm: null,
+  narration: EMPTY_NARRATION,
+  capabilities: { tutor: false, narration: false },
+  loadingRunExtras: false,
+  pulseStep: null,
 
   currentStep: 0,
   playing: false,
@@ -80,6 +121,10 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       fixtureName: name,
       plan,
       analysis,
+      algorithm: null,
+      narration: EMPTY_NARRATION,
+      capabilities: { tutor: false, narration: false },
+      pulseStep: null,
       currentStep: 0,
       playing: false,
       breakpoints: new Set<number>(),
@@ -88,6 +133,7 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
       loopBrackets: computeLoopBrackets(trace),
       ticks: computeStepTicks(trace, channels),
     });
+    void get().loadRunExtras();
   },
 
   play: () => {
@@ -113,6 +159,17 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
     const { trace } = get();
     if (!trace) return;
     set({ currentStep: clamp(index, trace.steps.length - 1), playing: false });
+  },
+
+  jumpToStepRef: (stepRef) => {
+    const { trace } = get();
+    const index = indexForStepRef(trace, stepRef);
+    if (index === null) return;
+    get().jumpTo(index);
+    set({ pulseStep: index });
+    setTimeout(() => {
+      if (get().pulseStep === index) set({ pulseStep: null });
+    }, 900);
   },
 
   jumpToStart: () => get().jumpTo(0),
@@ -173,6 +230,34 @@ export const usePlayerStore = create<PlayerState>()((set, get) => ({
 
       return { currentStep: i, playing: stillPlaying };
     });
+  },
+
+  loadRunExtras: async () => {
+    const { sourceCode, trace, fixtureName } = get();
+    if (!sourceCode || !trace) return;
+
+    set({ loadingRunExtras: true });
+    const providerKey = useSettingsStore.getState().providerKey;
+    const result = await fetchRunExtras({
+      source: sourceCode,
+      stdin: trace.meta.stdin,
+      providerKey,
+    });
+
+    // The user may have switched fixtures while this request was in
+    // flight — never let a stale response overwrite a newer run's state.
+    if (get().fixtureName !== fixtureName) return;
+
+    if (result) {
+      set({
+        algorithm: result.algorithm,
+        narration: result.narration,
+        capabilities: result.capabilities,
+        loadingRunExtras: false,
+      });
+    } else {
+      set({ loadingRunExtras: false });
+    }
   },
 }));
 

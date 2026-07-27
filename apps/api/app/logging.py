@@ -36,6 +36,14 @@ def bind_sensitive_value(value: str | None) -> None:
     _current_secrets.set(_current_secrets.get() | {value})
 
 
+def scrub_secrets(text: str) -> str:
+    """Public entry point for scrubbing a plain string outside the
+    structlog pipeline — e.g. an exception handler formatting a traceback
+    for a response or an external error report. Uses the same
+    request-scoped secret set `bind_sensitive_value` populates."""
+    return _scrub(text)
+
+
 def _scrub(value: Any) -> Any:
     secrets = _current_secrets.get()
     if isinstance(value, str):
@@ -65,6 +73,12 @@ def configure_logging(*, output: TextIO | None = None) -> None:
             structlog.contextvars.merge_contextvars,
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
+            # Must run before the redaction processor: exc_info starts as a
+            # live exception object, not text, so a secret embedded in an
+            # exception's message would otherwise reach JSONRenderer
+            # unscrubbed. format_exc_info turns it into a formatted string
+            # first so `_redact_secrets_processor` can actually see it.
+            structlog.processors.format_exc_info,
             _redact_secrets_processor,
             structlog.processors.JSONRenderer(),
         ],
