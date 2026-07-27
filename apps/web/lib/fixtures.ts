@@ -21,10 +21,31 @@ export const FIXTURE_NAMES = [
   "large_trace_40k",
 ] as const;
 
-export type FixtureName = (typeof FIXTURE_NAMES)[number];
+/**
+ * The Phase 4 C++ fixtures (docs/PRD.md §3.5, fixtures/cpp/) — a second,
+ * separate list rather than appended to FIXTURE_NAMES above: that array
+ * and fixtures/README.md's "twelve" are the shared, append-only Python
+ * set (CLAUDE.md), and this is deliberately not another silent addition
+ * to it. `/api/fixtures/[name]` reads these from fixtures/cpp/ instead of
+ * fixtures/. Regenerate with fixtures/cpp/generate.py after editing any
+ * fixtures/cpp/programs/*.cpp source or the runtime/pass it's compiled
+ * against.
+ */
+export const CPP_FIXTURE_NAMES = [
+  "linked_list_reversal_cpp",
+  "vector_sort_cpp",
+  "bst_insert_cpp",
+  "dfs_adjacency_list_cpp",
+  "pointer_aliasing_cpp",
+  "out_of_bounds_write_cpp",
+] as const;
+
+export type FixtureName = (typeof FIXTURE_NAMES)[number] | (typeof CPP_FIXTURE_NAMES)[number];
 
 export function isFixtureName(value: string): value is FixtureName {
-  return (FIXTURE_NAMES as readonly string[]).includes(value);
+  return (
+    (FIXTURE_NAMES as readonly string[]).includes(value) || (CPP_FIXTURE_NAMES as readonly string[]).includes(value)
+  );
 }
 
 export interface FixtureBundle {

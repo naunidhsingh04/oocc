@@ -1,0 +1,70 @@
+{
+  "structures": [
+    {
+      "kind": "array_2d",
+      "root_ref": "o2",
+      "confidence": 0.8
+    },
+    {
+      "kind": "array",
+      "root_ref": "o3",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o6",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o8",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o10",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o12",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o13",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o19",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o21",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o23",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o26",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o29",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o31",
+      "confidence": 0.6
+    }
+  ],
+  "insights": []
+}

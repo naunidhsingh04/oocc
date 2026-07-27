@@ -19,6 +19,7 @@ start Phase N+1 work inside a Phase N session, even if it looks quick.
 | Executor | separate service/container — never in the API process |
 | Data | Postgres 16 + pgvector, Redis |
 | Agents (Phase 3+) | LangGraph, Gemini 2.5 Flash via bring-your-own key |
+| C++ engine (Phase 4+) | libclang source-to-source pass → wasi-sdk → WASM — see Phase 4 backend below |
 | JS package manager | pnpm workspaces + Turborepo |
 | Python package manager | uv workspace (one shared venv, one `uv.lock`) |
 
@@ -42,7 +43,7 @@ oocc/
 ├─ apps/
 │  ├─ web/                        Next.js app — Person A
 │  │  ├─ lib/player/              playback store (Zustand) — see below
-│  │  ├─ lib/fixtures.ts          the 12 fixture names + dev-only loader
+│  │  ├─ lib/fixtures.ts          the 12 Python + 6 C++ fixture names + dev-only loader
 │  │  ├─ lib/panels/              generic, trace-only panel logic (no algorithm knowledge)
 │  │  ├─ lib/api/                 the real FastAPI backend client — see Phase 3 frontend below
 │  │  ├─ lib/settings/            provider-key storage + validation (Zustand)
@@ -70,11 +71,17 @@ oocc/
 │     ├─ evals/                   insight_scanner eval suite (20 known-bug programs)
 │     └─ app/executor_client.py   the only way apps/api ever calls services/executor
 ├─ services/
-│  └─ executor/                   separate container from day one — Person B
-│     └─ executor_app/tracer.py   Tracer (full) + CounterTracer (counts-only, fast)
-└─ fixtures/                      ⚠️ SHARED — twelve golden traces + generator
-   (each fixture also has a committed *.analysis.json and *.plan.json — see
-   Phase 2 backend below)
+│  ├─ executor/                   separate container from day one — Person B
+│  │  └─ executor_app/tracer.py   Tracer (full) + CounterTracer (counts-only, fast)
+│  └─ cpp-executor/                the C++ engine — see Phase 4 backend below
+│     ├─ runtime/                 header-only C++ runtime linked into every instrumented program
+│     ├─ cpp_executor/            instrument.py (the pass), toolchain.py, compile_service.py
+│     └─ tests/                   native (non-wasm) runtime tests + pass/service pytest suite
+├─ fixtures/                      ⚠️ SHARED — twelve golden Python traces + generator
+│  (each fixture also has a committed *.analysis.json and *.plan.json — see
+│  Phase 2 backend below)
+└─ fixtures/cpp/                  six C++ fixtures + generate.py — see Phase 4 backend below
+   (a separate, non-shared area — not part of the twelve-fixture set above)
 ```
 
 ## Commands
@@ -543,6 +550,254 @@ backend required just to look at a run). Things later phases must respect:
   at step 8 and only step 8 in that fixture — the fake answer says
   exactly that, not a made-up claim). Swap in a real key and nothing
   about the request path changes.
+
+## Phase 4 backend: C++ as a second engine (done)
+
+`services/cpp-executor` now compiles C++ to the same trace contract Python
+produces — `packages/contracts` did not change. Approach per PRD §3.5:
+a source-to-source pass instruments the user's C++, wasi-sdk compiles the
+instrumented source to WASM, and (for fixtures/testing in this phase)
+Node's built-in WASI runs it; a real browser worker is Phase 4 frontend's
+job, not this session's — see "What's deliberately not built yet" below.
+Things later phases must respect:
+
+- **libclang Python bindings, not C++ LibTooling.** This sandbox has no
+  LLVM/Clang *development* libraries — only Apple's bundled
+  `libclang.dylib` — and building full LLVM+Clang via Homebrew is a
+  multi-gigabyte, multi-hour compile that didn't fit this session. Every
+  doc comment in `services/cpp-executor` calls this out where it matters;
+  `instrument.py`'s own module docstring is the canonical explanation.
+  libclang's AST cursors + source-range text splicing is the same
+  underlying Clang AST, reached through the C API instead of the C++
+  wrapper — the instrumented output and everything downstream of it is
+  identical either way. If a real LibTooling toolchain ever becomes
+  available in this environment, swapping it in only touches
+  `instrument.py`; the runtime and every fixture are unaffected.
+- **The address table (`oocc_runtime.hpp`)** assigns every `new`/`malloc`
+  allocation a stable `oN` id the moment it's made, via a from-scratch
+  arena allocator (a 64 MB static array + first-fit free list) rather
+  than interposing the platform's real `malloc` — this sidesteps
+  fragile cross-libc interposition entirely and gives full control over
+  every allocation's address and lifetime. **Two gotchas found building
+  this, both now load-bearing comments in the code**: (1) the address
+  table's own `std::unordered_map` triggers `operator new` for its node
+  storage, which re-enters the same allocator override — an
+  `in_bookkeeping()` reentrancy guard (`oocc_runtime.hpp`) stops this from
+  infinite-recursing, and also means the runtime's own internal
+  allocations (JSON string building, frame bookkeeping) never pollute the
+  trace's object-id space or `peak_heap_objects`. (2) `operator delete` is
+  overridden globally, so *other* static objects' destructors can invoke
+  it during program teardown in an order this TU doesn't control — if the
+  address table had already been destructed by then, that's a
+  use-after-destruction crash, observed for real. Fixed with a leaked
+  placement-new singleton (never `new Arena()` directly, which would
+  recursively re-enter the not-yet-initialized singleton through the same
+  overridden `operator new` — a static byte buffer + placement-new avoids
+  both traps at once).
+- **Raw pointers resolve through the address table to `{"ref":"oN"}`
+  exactly like a Python reference** (`oocc_trace.hpp`'s `describe_value`
+  pointer overload) — this is what lets the linked_list and binary_tree
+  panels built in Phase 2 render C++ pointer structures with **zero
+  frontend changes**, verified live (see below). A pointer whose target
+  isn't tracked (points at a stack primitive, or is dangling) degrades to
+  an inline untracked-pointer description rather than fabricating a heap
+  object the schema has no type for. A stack-resident container/struct
+  *held by value* (not behind a pointer) gets an identity from its own
+  address too (`get_or_register_local`, find-or-create rather than
+  always-fresh) — same mechanism, so a `std::vector<int> v;` local renders
+  as its own heap chip exactly like Python's by-reference model. **Known,
+  documented limitation**: that identity is never invalidated when its
+  owning frame returns, so a recursive function whose own stack frame
+  reuses the same address for a same-shaped container local across two
+  unrelated calls at the same depth could inherit the wrong identity —
+  none of the six fixtures hit this; see `oocc_engine.hpp`'s file
+  docstring for why fixing it properly didn't fit this pass's scope.
+- **A block-scoped local's binding is removed when its real C++ scope
+  ends, not when its owning function returns.** Found for real during a
+  post-implementation bug sweep: `oocc_bind`'s closure captures a variable
+  by reference, and this project's function-level-locals model (bindings
+  live until the function returns, matching Python) meant a variable
+  declared inside a nested `if`/`while`/`for` body kept a dangling
+  reference in `f.bindings` for the rest of the function after its block
+  exited — confirmed with a native repro (`local` still showing in
+  `locals`, with a stale-but-plausible value, at the step *after* its
+  `if` block ended) before any fix. `instrument.py` now injects
+  `oocc_scope_mark()`/`oocc_unbind_from(mark)` around every nested
+  compound statement (not the function's own top-level body, which keeps
+  its Python-style whole-function lifetime); a block-scoped variable now
+  correctly disappears from `locals` the step after its block ends. Known
+  remaining gap: `break`/`continue` skip the block's own closing-brace
+  unbind call, so a loop-body-scoped variable can still linger past an
+  early loop exit — none of the six fixtures use `break`/`continue`.
+- **`decltype(auto)`, not `auto`, for the synthesized return-value local**
+  (`instrument.py`'s `_return_replacement`). A function returning a
+  reference (`int& foo()`) had its `return expr;` rewritten to
+  `{ auto __oocc_rv = (expr); ...; return __oocc_rv; }` — `auto` always
+  copies, so this returned a reference to a local about to be destroyed.
+  Confirmed for real: clang itself emitted `-Wreturn-stack-address` on the
+  generated code, and a reference obtained through the return value no
+  longer aliased the original variable. `decltype(auto)` preserves the
+  expression's real value category (a reference stays a reference; a
+  by-value expression still materializes normally), fixing this with zero
+  behavior change for the by-value-return case every fixture actually
+  uses.
+- **`run_id` is not a `compile_service.compile_source` parameter, and
+  nothing about a specific run is baked into the cached wasm at all.** An
+  earlier version took `run_id` and threaded it into `instrument()`,
+  embedding it in the compiled artifact's `kRunMetaPrefix` constant — on a
+  cache hit, the returned bytes were compiled by a *previous* call, so the
+  caller's own `run_id` argument was silently ignored. Caught by a
+  concurrency test asserting identical output for identical source: two
+  threads compiling the same source with different `run_id`s produced
+  provably different wasm. Since a compiled artifact is legitimately
+  reusable across many logical runs of the same source, `run_id` doesn't
+  belong in the compile-time cache key at all — `compile_source` now
+  embeds a fixed placeholder, and the executor (whoever actually runs the
+  wasm and gets a trace back — `fixtures/cpp/generate.py` today, the
+  future browser worker) is responsible for overwriting `trace["run_id"]`
+  post-execution, the same way it already computes genuinely per-run
+  values like `meta.duration_ms`. The same test also fixed a real (if
+  narrower) race: `compile_source` used to write into a hash-derived, not
+  per-call-unique, temp filename, so two concurrent cold compiles of the
+  same source could corrupt each other's in-flight temp file;
+  `tempfile.mkstemp` + `os.replace` (atomic on POSIX) fixes this
+  independently of the `run_id` issue above.
+- **`changed[]` is built during the same walk that produces the JSON, not
+  by re-parsing it afterward.** Every `describe_value`/`describe_object_body`
+  call takes a `path` (the ChangedPath grammar — `f1.local`, `oN[i]`,
+  `oN.field`, `oN{key}`) and records its own Value fragment into
+  `HeapCollector::current_paths` as a side effect, mirroring
+  `Tracer._flatten_paths` in the Python engine but computed in lockstep
+  with the JSON rather than as a second pass — the two have to stay
+  synchronized or the array/heap panels' highlight animations go wrong.
+- **The trace's own output channel is fd 1, not a dedicated fd 3.**
+  `std::cout` is redirected through a custom `streambuf`
+  (`oocc_engine.hpp`'s `CapturingStreambuf`) that buffers into
+  `pending_stdout()` instead of writing immediately — real fd 1 is
+  therefore never touched by the user's own `std::cout` output, freeing
+  it for the trace's single final write. This sidesteps every WASI host
+  needing bespoke "open an extra output fd" setup (Node's `node:wasi` has
+  no simple way to hand a wasm instance a raw writable fd beyond 0/1/2
+  without preopening a directory) — any WASI runtime, including the
+  future browser worker shim, already implements fd 1's `fd_write` on day
+  one. Raw C stdio (`printf`) isn't captured (a documented scope cut) and
+  would race this if a program used it; none of the six fixtures do.
+- **A genuine WASM trap can't be caught by the C++ that's trapping** — the
+  instance dies immediately with no unwind, so `finalize_and_emit`'s
+  normal fd-1 write never runs. Every completed step is therefore *also*
+  appended, as it completes, to a flat ND-JSON buffer exposed via two
+  explicitly-exported functions, `oocc_trap_buffer_ptr()` /
+  `oocc_trap_buffer_len()` (`-Wl,--export=...`, since wasm-ld doesn't
+  export arbitrary symbols by default) — a caller that catches the trap
+  as a host-level exception can still read this directly out of the dead
+  instance's linear memory, which remains valid even after the instance
+  itself can no longer execute. Verified for real: the
+  `out_of_bounds_write` fixture's `operator[]` walks off the end of a
+  3-element vector by 100,000,000 elements, which exceeds the instance's
+  current linear memory and traps; `fixtures/cpp/generate.py`'s recovery
+  path (the same one a browser worker will use) pulls 8 completed steps
+  back out, wraps them in a `status: "runtime_error"` envelope with a
+  populated `error` object, and the committed fixture's last step still
+  shows the real 3-element vector and the message already printed —
+  "land the player on the last good step," achieved. The trap buffer only
+  tracks the first `keep_head` (40,000) steps; a trap after that point is
+  the rare case of a program running cleanly for tens of thousands of
+  steps before finally crashing, and degrades to "somewhere in the head"
+  rather than the exact final step.
+- **`cursor.extent.*.offset` from libclang is not trustworthy once
+  wasi-sysroot's extra `-isystem`/`-resource-dir` parse args are added** —
+  reproduced directly: a statement's `.column` correctly pointed at its
+  first character while `.offset` pointed 2 bytes past it, consistently,
+  across every statement in a file. `.line`/`.column` stayed reliable in
+  the same test. `instrument.py`'s `LineIndex` computes every offset from
+  `(line, column)` against the source text itself instead — never from
+  `.offset` directly — which is the fix, not a workaround layered on top
+  of a still-present bug.
+- **A `Describer<T>` specialization is spliced in right after its
+  struct's own closing `};`, never collected and emitted up front** —
+  its `body()` accesses `T`'s fields, so `T` must be fully defined first.
+  Emitting all describers before any user code (the first version built)
+  is a real compile error, not a hypothetical: `Describer<Node>` accessing
+  `Node::val` before `struct Node` exists.
+- **STL pretty-printers** (§3.2 heap-type projections, `oocc_stl_printers.hpp`):
+  `vector` (incl. the `vector<bool>` bitset-proxy special case), `array`,
+  `pair`, `list`, `deque`, `map`, `unordered_map`, `set`, `unordered_set`,
+  `optional`, `stack`, `queue`, `priority_queue` — the full §3.5 list.
+  `stack`/`queue`/`priority_queue` reach their protected underlying
+  container via a derived-class pointer-to-member, the same technique
+  GDB's own STL pretty-printers use (no public iteration API otherwise
+  exists on a container adaptor). `string` lives in `oocc_trace.hpp`
+  itself (inline ≤40 chars, heap `str` object beyond that — same
+  threshold as `Tracer.MAX_INLINE_STR_LEN`, for cross-language
+  consistency). Anything else degrades to `opaque`, or compiles only if
+  the pass generates a `Describer<T>` for it (user structs).
+- **Teaching-subset diagnostics** (`instrument.py`'s
+  `UNSUPPORTED_CURSOR_KINDS`): lambdas, class templates, and function
+  templates are detected at parse time with the exact message text PRD
+  §3.5 specifies ("OOCC can't trace lambda expressions yet. This program
+  will still compile and run, but without step data.") rather than a
+  generic clang parse error. The pass's job stops at detecting and naming
+  the construct; `compile_service.py`'s `compile_untraced` is the actual
+  fallback — it compiles the user's original, uninstrumented source
+  directly (no runtime, no injected calls, so it still runs, just without
+  step data), which `compile_source` signals is available via
+  `CompileResult.untraced_offer`. Presenting that as an actual offer to a
+  user is a frontend concern for a later session.
+- **Compilation is cached by `source_hash`** (`compile_service.py`), a
+  flat directory keyed by hash — checked before touching clang at all, so
+  a cache hit is a single file read, never a subprocess spawn, trivially
+  clearing §3.5's "warm ~0ms" target (tested: a warm compile completes in
+  well under the test's 500ms bound, a cold one spawns real `clang++`).
+  Promoting this to a shared Redis-backed cache (matching
+  `apps/api/app/cache.py`'s pattern for the Python deterministic-analysis
+  cache) is future infra work once this sits behind a real endpoint, not
+  a behavior change — same reasoning `app/cache.py`'s own docstring gives
+  for its process-local dict.
+- **No CMake.** The teaching subset is always a single translation unit,
+  so a single `clang++` invocation (`toolchain.py`'s `compile_to_wasm`)
+  does everything CMake would orchestrate for a multi-TU build. Revisit
+  if a later phase needs multiple translation units.
+- **wasi-sdk has no Homebrew formula** — it's a plain extracted release
+  tarball at `.toolchains/wasi-sdk-33.0-arm64-macos/` (gitignored; see
+  `services/cpp-executor/README.md` for the exact download command any
+  fresh environment needs to run once). `cpp_executor/toolchain.py`
+  centralizes every path derived from it so there's exactly one place to
+  update if the extracted location or version ever changes.
+- **Six fixtures committed** (`fixtures/cpp/`, generated by
+  `fixtures/cpp/generate.py`, mirroring `fixtures/generator/`'s role for
+  the Python twelve): `linked_list_reversal`, `vector_sort`, `bst_insert`,
+  `dfs_adjacency_list`, `pointer_aliasing`, `out_of_bounds_write` (the
+  last one committed with `status: "runtime_error"` via the trap-recovery
+  path above, not skipped). Each fixture's `.analysis.json`/`.plan.json`
+  come from the *same* `structure_detector`/`viz_planner` Python modules
+  Phase 2 built — proof by construction that those modules are genuinely
+  language-agnostic, since nothing about them changed to accept C++
+  traces. `insight_scanner` is skipped for C++ fixtures (`insights: []`)
+  since it does Python-`ast`-specific static analysis; a C++-aware
+  insight scanner is out of this phase's scope. A separate,
+  non-shared area from the twelve-Python-fixture set — see the folder map.
+- **Done-criterion verified live, via Playwright screenshots against the
+  real dev stack**: `linked_list_reversal_cpp` renders in the *existing*
+  `linked_list` panel showing the correctly-reversed `4 → 3 → 2 → 1`
+  chain, call stack, and channel-colored variables — with genuinely zero
+  changes to any panel or detection component
+  (`components/panels/LinkedListPanel.tsx`, `lib/panels/linkedListDetection.ts`
+  are untouched). The only frontend edits in this phase are data-layer
+  wiring so the existing dev fixture picker can find C++ fixtures at all:
+  `lib/fixtures.ts`'s new `CPP_FIXTURE_NAMES` (deliberately a *separate*
+  list from the shared, append-only `FIXTURE_NAMES`, not appended to it),
+  and `app/api/fixtures/[name]/route.ts` reading from `fixtures/cpp/`
+  when a name ends in `_cpp`. `typecheck`/`lint` both pass unchanged.
+- **What's deliberately not built yet**: a real browser worker executing
+  user-submitted C++ live (not just committed fixtures), the language
+  selector UI, and a `POST`-style backend endpoint wrapping
+  `compile_service.compile_source` for the frontend to call. This mirrors
+  every prior phase's own backend/frontend split (Phase 1–3 each got a
+  separate "frontend" session) — `compile_service.py`'s `CompileResult`
+  (wasm bytes, diagnostics, `untraced_offer`) is the shape a Phase 4
+  frontend session's API layer would wrap, and the six fixtures are
+  exactly what CLAUDE.md's own Phase 4 backend brief said they're for:
+  "so Person A can wire the language selector immediately."
 
 ## Tests ship with the code they test
 

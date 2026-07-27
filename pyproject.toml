@@ -2,6 +2,7 @@
 members = [
   "apps/api",
   "services/executor",
+  "services/cpp-executor",
   "packages/contracts/python",
   "fixtures/generator",
 ]

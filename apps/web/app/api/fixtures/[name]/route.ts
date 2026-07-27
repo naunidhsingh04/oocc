@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { NextResponse } from "next/server";
-import { isFixtureName } from "@/lib/fixtures";
+import { CPP_FIXTURE_NAMES, isFixtureName } from "@/lib/fixtures";
 
 // apps/web/app/api/fixtures/[name] -> repo root is six levels up.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
@@ -17,12 +17,22 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
     return NextResponse.json({ error: `unknown fixture "${name}"` }, { status: 404 });
   }
 
+  // C++ fixtures (Phase 4, docs/PRD.md §3.5) live under fixtures/cpp/,
+  // named "<name>_cpp" in the picker to keep them visibly distinct from
+  // the shared, append-only twelve-fixture Python set — see
+  // lib/fixtures.ts's CPP_FIXTURE_NAMES.
+  const isCpp = (CPP_FIXTURE_NAMES as readonly string[]).includes(name);
+  const baseName = isCpp ? name.replace(/_cpp$/, "") : name;
+  const dir = isCpp ? "fixtures/cpp" : "fixtures";
+  const programExt = isCpp ? "cpp" : "py";
+  const programDir = isCpp ? "fixtures/cpp/programs" : "fixtures/generator/programs";
+
   try {
     const [traceText, source, analysisText, planText] = await Promise.all([
-      readFile(resolve(repoRoot, "fixtures", `${name}.trace.json`), "utf-8"),
-      readFile(resolve(repoRoot, "fixtures/generator/programs", `${name}.py`), "utf-8"),
-      readFile(resolve(repoRoot, "fixtures", `${name}.analysis.json`), "utf-8"),
-      readFile(resolve(repoRoot, "fixtures", `${name}.plan.json`), "utf-8"),
+      readFile(resolve(repoRoot, dir, `${baseName}.trace.json`), "utf-8"),
+      readFile(resolve(repoRoot, programDir, `${baseName}.${programExt}`), "utf-8"),
+      readFile(resolve(repoRoot, dir, `${baseName}.analysis.json`), "utf-8"),
+      readFile(resolve(repoRoot, dir, `${baseName}.plan.json`), "utf-8"),
     ]);
     return NextResponse.json({
       trace: JSON.parse(traceText) as unknown,

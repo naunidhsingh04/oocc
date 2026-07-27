@@ -44,3 +44,11 @@ __pycache__/
 # Coverage
 coverage/
 htmlcov/
+
+# Downloaded toolchains (wasi-sdk — no Homebrew formula exists; see
+# services/cpp-executor/README.md for the download command)
+.toolchains/
+dump.rdb
+
+# cpp_executor.compile_service's source_hash-keyed wasm cache
+services/cpp-executor/.compile_cache/

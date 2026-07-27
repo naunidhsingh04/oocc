@@ -1,7 +1,7 @@
 "use client";
 
 import { usePlayerStore } from "@/lib/player";
-import { fetchFixture, FIXTURE_NAMES, isFixtureName } from "@/lib/fixtures";
+import { CPP_FIXTURE_NAMES, fetchFixture, FIXTURE_NAMES, isFixtureName } from "@/lib/fixtures";
 import { useState } from "react";
 
 /**
@@ -51,6 +51,13 @@ export function FixturePicker() {
             {name}
           </option>
         ))}
+        <optgroup label="C++ (Phase 4)">
+          {CPP_FIXTURE_NAMES.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </optgroup>
       </select>
       {error ? (
         <span role="alert" className="font-mono-label text-[11px] text-mutate">
