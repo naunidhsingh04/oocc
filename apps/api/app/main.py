@@ -17,7 +17,11 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
+from app.auth.tokens import SESSION_COOKIE_NAME
 from app.logging import bind_sensitive_value, configure_logging
+from app.routers.auth import router as auth_router
+from app.routers.problems import router as problems_router
+from app.routers.progress import router as progress_router
 from app.routers.runs import router as runs_router
 from app.routers.settings import router as settings_router
 from app.routers.tutor import router as tutor_router
@@ -46,8 +50,14 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next: RequestResponseEndpoint) -> Response:
     # Bind before logging anything for this request: everything from here
-    # on, in this request only, has the key scrubbed if it appears.
+    # on, in this request only, has the key scrubbed if it appears. The
+    # session cookie is bound here too (not just in
+    # app.routers.auth.get_current_user_optional), because this middleware
+    # logs the full request headers below, before any route dependency
+    # gets a chance to run — binding inside the dependency alone would be
+    # too late to protect that very log line.
     bind_sensitive_value(request.headers.get("x-provider-key"))
+    bind_sensitive_value(request.cookies.get(SESSION_COOKIE_NAME))
     logger.info(
         "request.received",
         method=request.method,
@@ -79,6 +89,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 app.include_router(runs_router)
 app.include_router(tutor_router)
 app.include_router(settings_router)
+app.include_router(auth_router)
+app.include_router(problems_router)
+app.include_router(progress_router)
 
 
 @app.get("/health")

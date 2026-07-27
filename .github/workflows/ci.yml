@@ -99,3 +99,60 @@ jobs:
       # validates all twelve fixtures/*.trace.json against trace.schema.json.
       - run: uv run --package oocc-contracts pytest packages/contracts/python/tests -v
       - run: pnpm --filter @oocc/contracts test
+
+  compiler-explorer:
+    name: compiler-explorer (native build+test, WASM build, round-trip)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native toolchain
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build
+
+      - name: Configure + build native (OOCC_TRACE=ON)
+        run: |
+          cmake -S services/compiler-explorer -B services/compiler-explorer/build \
+            -G Ninja -DOOCC_TRACE=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build services/compiler-explorer/build
+
+      - name: Native test suite (Catch2)
+        run: ./services/compiler-explorer/build/oocc_compiler_tests
+
+      - name: Native --emit=all sanity pass over every example
+        run: |
+          set -e
+          for f in services/compiler-explorer/examples/*.ooc; do
+            echo "=== $f ==="
+            # 10_parse_error.ooc is expected to exit 1 -- don't fail the
+            # job on that one file's nonzero status.
+            ./services/compiler-explorer/build/oocc_compiler --emit=all "$f" \
+              > /dev/null || [ "$(basename "$f")" = "10_parse_error.ooc" ]
+          done
+
+      - name: Install Emscripten (emsdk)
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: latest
+
+      - name: Configure + build WASM (OOCC_TRACE=ON)
+        run: |
+          emcmake cmake -S services/compiler-explorer -B services/compiler-explorer/build-wasm \
+            -G Ninja -DOOCC_TRACE=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build services/compiler-explorer/build-wasm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Native/WASM byte-identical round-trip over the ten examples
+        run: |
+          node services/compiler-explorer/tools/compare_native_wasm.mjs \
+            --native services/compiler-explorer/build/oocc_compiler \
+            --wasm services/compiler-explorer/build-wasm/oocc_compiler.js \
+            --examples services/compiler-explorer/examples
+
+      - name: Native build with OOCC_TRACE=OFF still compiles (release path)
+        run: |
+          cmake -S services/compiler-explorer -B services/compiler-explorer/build-release \
+            -G Ninja -DOOCC_TRACE=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build services/compiler-explorer/build-release

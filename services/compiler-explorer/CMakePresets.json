@@ -1,0 +1,32 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "native-dev",
+      "displayName": "Native, OOCC_TRACE=ON (dev)",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "OOCC_TRACE": "ON",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "native-release",
+      "displayName": "Native, OOCC_TRACE=OFF (release)",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "OOCC_TRACE": "OFF",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "wasm",
+      "displayName": "Emscripten (invoke via emcmake, not directly)",
+      "binaryDir": "${sourceDir}/build-wasm",
+      "cacheVariables": {
+        "OOCC_TRACE": "ON",
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ]
+}

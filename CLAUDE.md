@@ -20,6 +20,8 @@ start Phase N+1 work inside a Phase N session, even if it looks quick.
 | Data | Postgres 16 + pgvector, Redis |
 | Agents (Phase 3+) | LangGraph, Gemini 2.5 Flash via bring-your-own key |
 | C++ engine (Phase 4+) | libclang source-to-source pass → wasi-sdk → WASM — see Phase 4 backend below |
+| Accounts (Phase 5+) | magic-link email + GitHub OAuth, signed-cookie sessions — see Phase 5 backend Track A below |
+| Compiler explorer (Phase 5+) | own lexer/parser/bytecode VM in C++, Emscripten WASM — see Phase 5 backend Track B below |
 | JS package manager | pnpm workspaces + Turborepo |
 | Python package manager | uv workspace (one shared venv, one `uv.lock`) |
 
@@ -68,11 +70,17 @@ oocc/
 │  └─ api/                        FastAPI app — Person B
 │     ├─ app/routers/runs.py      POST /api/runs — see Phase 2 backend below
 │     ├─ app/routers/tutor.py     POST /api/tutor (SSE) — see Phase 3 backend below
+│     ├─ app/routers/{auth,problems,progress}.py   see Phase 5 backend Track A below
 │     ├─ app/analysis/            structure_detector, insight_scanner,
 │     │                           complexity_analyst, viz_planner — all deterministic
 │     ├─ app/agents/              the LangGraph pipeline — see Phase 3 backend below
 │     ├─ app/tutor/               tutor context assembly + answer validation
 │     ├─ app/rag/                 concept_chunks store, embeddings, retrieval
+│     ├─ app/auth/                magic link + GitHub OAuth, session tokens
+│     ├─ app/problems/            problem store, grading (via the real executor)
+│     ├─ app/progress/            mastery model + spaced-repetition review queue
+│     ├─ app/curriculum/          full concept articles (concepts table, not concept_chunks)
+│     ├─ app/storage/             gzipped-trace object storage (S3/R2 real + in-memory fake)
 │     ├─ app/security.py          ProviderKey — see Phase 3 backend below
 │     ├─ app/cache.py             deterministic-output cache (source_hash -> 7d TTL)
 │     ├─ evals/                   insight_scanner eval suite (20 known-bug programs)
@@ -80,10 +88,15 @@ oocc/
 ├─ services/
 │  ├─ executor/                   separate container from day one — Person B
 │  │  └─ executor_app/tracer.py   Tracer (full) + CounterTracer (counts-only, fast)
-│  └─ cpp-executor/                the C++ engine — see Phase 4 backend below
-│     ├─ runtime/                 header-only C++ runtime linked into every instrumented program
-│     ├─ cpp_executor/            instrument.py (the pass), toolchain.py, compile_service.py
-│     └─ tests/                   native (non-wasm) runtime tests + pass/service pytest suite
+│  ├─ cpp-executor/                the C++ engine — see Phase 4 backend below
+│  │  ├─ runtime/                 header-only C++ runtime linked into every instrumented program
+│  │  ├─ cpp_executor/            instrument.py (the pass), toolchain.py, compile_service.py
+│  │  └─ tests/                   native (non-wasm) runtime tests + pass/service pytest suite
+│  └─ compiler-explorer/          own lexer/parser/bytecode VM — see Phase 5 backend Track B below
+│     ├─ include/oocc_compiler/   lexer, parser, ast, compiler, vm, trace (OOCC_TRACE) headers
+│     ├─ tools/main.cpp           native CLI (--emit=tokens|ast|bytecode|trace|all)
+│     ├─ wasm/bindings.cpp        Embind wrapper around the same oocc::run_pipeline()
+│     └─ examples/                ten .ooc programs, one a deliberate parse error
 ├─ fixtures/                      ⚠️ SHARED — twelve golden Python traces + generator
 │  (each fixture also has a committed *.analysis.json and *.plan.json — see
 │  Phase 2 backend below)
@@ -115,6 +128,14 @@ uv run --package oocc-api mypy apps/api/app
 
 # Local stack
 docker compose up        # postgres+pgvector, redis, api, executor, web
+
+# services/compiler-explorer (native + WASM, see Phase 5 backend Track B)
+cmake -S services/compiler-explorer -B services/compiler-explorer/build -DOOCC_TRACE=ON
+cmake --build services/compiler-explorer/build
+./services/compiler-explorer/build/oocc_compiler_tests
+./services/compiler-explorer/build/oocc_compiler --emit=all path/to/source.ooc
+# WASM: emcmake cmake -S services/compiler-explorer -B .../build-wasm ... && cmake --build ...
+# then: node services/compiler-explorer/tools/compare_native_wasm.mjs --native ... --wasm ...
 ```
 
 `pnpm gen:contracts:check` is the authority on whether generated contract
@@ -929,6 +950,143 @@ mirroring Phase 1's fixture-only precedent rather than waiting on §8's
   variable chips update live) with an "Expand to workspace" one-click
   escape hatch. All twelve articles load with zero console/page errors.
   `pnpm typecheck` / `lint` / `test` (107 tests) / `build` all pass.
+
+## Phase 5 backend, Track A: accounts, progress, and the problem library (done)
+
+`apps/api` now has real auth, the full §8 schema, a 40-problem library with
+CI-verified reference solutions, and a deterministic mastery model. Built
+and verified with no live Postgres/Redis/SMTP/GitHub reachable in this dev
+sandbox — same constraint as every earlier phase. Things later phases must
+respect:
+
+- **`concepts` (new, `migrations/0002_accounts_and_progress.sql`) is a
+  different table from `concept_chunks` (Phase 3/0001) and neither is
+  derived from the other.** `concept_chunks` holds short RAG passages for
+  the tutor; `concepts` holds full curriculum articles with `body_md` and
+  `prereq_ids`. Both key off the same human-chosen concept id (e.g.
+  `"binary-search"`) so they join without a lookup layer, but a change to
+  one's content doesn't imply anything about the other's.
+- **Every new store follows the Phase 3 RAG precedent exactly**: a
+  protocol/interface with a real Postgres-backed implementation and an
+  in-memory fake with the identical interface, used in every test. This now
+  covers users/sessions (`app/auth/`), problems (`app/problems/`), progress
+  (`app/progress/`), and traces (`app/storage/trace_store.py`). GitHub OAuth
+  and magic-link email are mocked the same way `executor_client` mocks the
+  executor — a fake HTTP transport / a `MailSender` fake that records
+  what would've been sent — never a live network call in a test.
+- **Sessions are a stateless signed cookie** (`itsdangerous`), not a
+  server-side session table — the simplest option that satisfies the
+  brief. There's no "log out everywhere" support because nothing asked for
+  it; revisit if that's ever needed.
+- **Every new secret type gets the same redaction test as `X-Provider-Key`**
+  (`apps/api/tests/auth/test_token_redaction.py`, mirroring
+  `test_logging_redaction.py`): magic-link tokens, GitHub OAuth tokens, and
+  session tokens are all asserted to never reach a log record, including
+  one that never travelled the current request.
+- **Grading a learner's submission runs it through the real sandboxed
+  `services/executor`, never in-process `exec`.** Only the 40 seeded
+  reference solutions are ever `exec`'d directly, and only by the CI gate
+  (`apps/api/tests/problems/test_reference_solutions.py`) — never at
+  request time. **Gotcha found for real**: `import json` inside the traced
+  sandbox raises a `RecursionError` a couple of steps in (the tracer's
+  per-line instrumentation isn't on the executor's documented allowlist for
+  it) — the grading harness round-trips results as Python tuple/literal
+  text instead of JSON and reads them back with `ast.literal_eval`
+  (`app/problems/grading.py`), never `import json` inside the sandboxed
+  program itself.
+- **Problem shape**: `tests` is `[{"args": [...], "expected": <json>}, ...]`,
+  the graded function is always named `solve`. Every one of the 40 problems
+  has exactly 8 tests (320 cases total) and the CI gate actually executes
+  every reference solution against its own tests — verified independently,
+  not just asserted: `uv run --package oocc-api pytest
+  apps/api/tests/problems/test_reference_solutions.py -v` is 82 passing
+  tests (40 problems × 2 checks each, plus 2 collection-level checks).
+- **No dedicated problem→concept link exists in §8's schema.** A problem's
+  `tags` double as the concept ids its submissions update progress
+  against — a judgment call flagged in `problems.py`'s docstring, not a
+  data-modeled decision; revisit if problems ever need a many-to-many
+  mapping distinct from their display tags.
+- **Mastery model** (`app/progress/mastery.py`, pure functions, unit tested
+  directly like `complexity_analyst`'s deterministic core): pass reward
+  0.30 / fail penalty 0.15, scaled down by retries/hints/tutor-questions,
+  a flat per-insight-kind penalty, and a scrub-ratio multiplier (full
+  credit at ≥20% of the trace viewed, floor 0.5×). `time_to_solve_s` is
+  recorded but not scored — there's no baseline yet to normalize against.
+  **Review schedule** (`app/progress/review_queue.py`) is mastery-bucketed
+  fixed intervals (1/3/7/14/30 days), not discrete SM-2 quality grades,
+  since mastery here is already a continuous score — a reasoned default,
+  not data-calibrated; revisit once real usage data exists.
+- **`uv run --package oocc-api pytest apps/api/tests -v` is 232 passing
+  tests**, fully offline; `ruff check`/`ruff format --check`/`mypy --strict`
+  all clean.
+
+## Phase 5 backend, Track B: the compiler explorer engine (done)
+
+`services/compiler-explorer/` (new, independent of `services/cpp-executor`)
+is a from-scratch lexer → recursive-descent parser → AST → bytecode
+compiler → stack VM for a small teaching language (numbers/bools, `let`,
+`if`/`else`, `while`, `print` — deliberately no functions), instrumented
+behind an `OOCC_TRACE` CMake option. Things later phases must respect:
+
+- **This is not `services/cpp-executor`.** That engine traces arbitrary
+  user-submitted C++ for the Phase 4 execution product. This one compiles
+  its own tiny teaching language so `/compiler` (Phase 5 frontend's job) can
+  cross-highlight source ↔ tokens ↔ AST ↔ bytecode ↔ VM steps. They share
+  nothing and don't need to.
+- **`astId` on every bytecode instruction and `span` on every AST node are
+  load-bearing, not optional metadata** — verified live: `--emit=bytecode`
+  on `examples/01_precedence.ooc` (`2 + 3 * 4`) shows three `CONST`
+  instructions with `astId`s 2/4/6 (the three operands) and the `multiply`/
+  `add` instructions with `astId`s 5/3, correctly reflecting the AST's own
+  shape. AST node ids are a monotonic parse-order counter; the root
+  `Program` node is always id 0. Error spans (`errors.hpp`) reuse the exact
+  same `{start,end,line,column}` shape as AST spans.
+- **No functions in this language, deliberately** — locals resolve to fixed
+  stack slots at compile time (clox-style), so there's no call-frame
+  machinery to instrument yet. Adding functions later is a real scope
+  expansion (call frames, a return-address stack), not a small patch.
+- **`OOCC_TRACE` gates emission at compile time, via `#ifdef`, not a
+  runtime flag** — verified both ways: `-DOOCC_TRACE=ON` and
+  `-DOOCC_TRACE=OFF` both build clean, and the release path genuinely
+  compiles none of the JSON-emission code in.
+- **One pipeline, not two.** Both the native CLI (`tools/main.cpp`) and the
+  WASM Embind export (`wasm/bindings.cpp`) call the same
+  `oocc::run_pipeline()` — the WASM side is a thin wrapper around
+  already-tested native code, never a second implementation that could
+  drift.
+- **Two real bugs found only by actually running the thing, not by
+  review**: (1) `JumpIfFalse`/`Jump` placeholder instructions weren't
+  reserving an operand slot before `patch_jump` indexed into it — caught by
+  a libstdc++ assertion crash while running the test binary. (2) globals
+  were serialized from an `unordered_map`, so native (libstdc++) and WASM
+  (libc++) produced different key orders in the trace JSON — caught by the
+  native/WASM round-trip script finding a genuine mismatch on
+  `09_accumulator_sum.ooc`; fixed by sorting keys before insertion. Also:
+  **Emscripten disables C++ exceptions by default**, silently turning every
+  `throw OoccError(...)` into a hard abort at the WASM/JS boundary — fixed
+  with `-fexceptions` on the WASM CMake target.
+- **Native/WASM byte-identical round-trip is genuinely verified, both
+  locally and in CI** (`.github/workflows/ci.yml`'s new `compiler-explorer`
+  job, `tools/compare_native_wasm.mjs`), not just asserted — re-run
+  independently from a clean build during review:
+  `oocc_compiler_tests.exe` is 108 assertions / 31 test cases passing, all
+  ten `examples/*.ooc` round-trip byte-for-byte between a fresh native
+  build and a fresh WASM build, and `examples/10_parse_error.ooc` exits 1
+  with a structured `{"error":{"stage":"ParseError",...,"span":{...}}}`
+  pointing at the correct token.
+- **Toolchain gotcha for this specific Windows/Git-Bash sandbox** (worth
+  knowing before assuming "no C++ toolchain" next session): none was
+  preinstalled, but `scoop install cmake` and `scoop install emscripten`
+  both work; `scoop install gcc` hit a broken/stale nuwen.net cache lock,
+  worked around with `scoop install mingw-winlibs` instead (a standard
+  MinGW-w64 distribution). Two more traps once a toolchain exists: CMake's
+  `"MinGW Makefiles"` generator fails to auto-detect `CMAKE_MAKE_PROGRAM`/
+  `CMAKE_CXX_COMPILER` when invoked from Git Bash (a known `sh.exe`-on-PATH
+  conflict with that generator) — pass both explicitly; and a built `.exe`
+  needs the MinGW `bin/` directory on `PATH` **at run time**, not just
+  build time, for its runtime DLLs, which Git Bash's own invocation doesn't
+  always resolve the same way PowerShell does — prefer PowerShell for
+  actually *running* a built native/WASM artifact in this environment.
 
 ## Tests ship with the code they test
 
