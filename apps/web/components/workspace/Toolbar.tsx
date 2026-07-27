@@ -20,6 +20,7 @@ export function Toolbar() {
   const fixtureName = usePlayerStore((state) => state.fixtureName);
   const status = usePlayerStore((state) => state.trace?.status);
   const hasTrace = usePlayerStore((state) => state.trace !== null);
+  const language = usePlayerStore((state) => state.trace?.language);
 
   function handleRun() {
     const { jumpToStart, play } = usePlayerStore.getState();
@@ -40,6 +41,12 @@ export function Toolbar() {
             No fixture loaded
           </span>
         )}
+        {/* Quiet engine indicator (docs/PRD.md Phase 4 frontend brief:
+            "the engine in use shown quietly in the status bar") — never
+            louder than the fixture chip it sits beside. */}
+        {language ? (
+          <span className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">{language}</span>
+        ) : null}
         {status && status !== "ok" ? <Chip tone={STATUS_TONE[status]}>{status}</Chip> : null}
         <AlgorithmBadge />
       </div>

@@ -38,7 +38,16 @@ export function FixturePicker() {
       </label>
       <select
         id="fixture-picker"
-        value={fixtureName ?? ""}
+        // A trace can be loaded from somewhere other than this picker now
+        // (a problem's fixture-backed run, a curriculum article's
+        // embedded trace expanded here) with a `fixtureName` that isn't
+        // one of this select's own <option> values — e.g. a problem slug
+        // like "binary-search". Falling back to "" instead of passing
+        // that straight through avoids the browser silently coercing an
+        // unmatched value to whichever <option> happens to be first,
+        // which read as this dev-only picker showing the wrong fixture
+        // selected.
+        value={fixtureName && isFixtureName(fixtureName) ? fixtureName : ""}
         onChange={handleChange}
         disabled={loading}
         className="h-6 rounded-control border border-rule bg-panel px-1.5 font-mono-label text-[11px] text-ink"

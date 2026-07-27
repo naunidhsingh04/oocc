@@ -8,6 +8,8 @@ import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
+  { href: "/problems", label: "Problems" },
+  { href: "/curriculum", label: "Curriculum" },
   { href: "/styleguide", label: "Styleguide" },
 ];
 
@@ -27,7 +29,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
         </Link>
         <nav className="flex items-center gap-1" aria-label="Primary">
           {NAV_LINKS.map((link) => {
-            const active = pathname === link.href;
+            const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
             return (
               <Link
                 key={link.href}

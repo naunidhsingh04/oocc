@@ -1,7 +1,8 @@
 "use client";
 
+import { cpp } from "@codemirror/lang-cpp";
 import { python } from "@codemirror/lang-python";
-import { EditorState, type StateEffect } from "@codemirror/state";
+import { Compartment, EditorState, type StateEffect } from "@codemirror/state";
 import { EditorView, lineNumbers } from "@codemirror/view";
 import { getStateAt, usePlayerStore } from "@/lib/player";
 import { computeInsightsByLine, EMPTY_INSIGHTS } from "@/lib/insights/insightsView";
@@ -31,11 +32,17 @@ export interface CodeEditorProps {
  * pipeline to re-trace edited code against — Phase 2's run API is what
  * makes this editable.
  */
+function languageExtension(language: "python" | "cpp" | undefined) {
+  return language === "cpp" ? cpp() : python();
+}
+
 export function CodeEditor({ className }: CodeEditorProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const compartmentRef = useRef(new Compartment());
 
   const sourceCode = usePlayerStore((state) => state.sourceCode);
+  const language = usePlayerStore((state) => state.trace?.language);
   const currentLine = usePlayerStore((state) => getStateAt(state.trace, state.currentStep)?.line ?? 0);
   const topFrameLocalNames = usePlayerStore((state) => {
     const step = getStateAt(state.trace, state.currentStep);
@@ -77,7 +84,7 @@ export function CodeEditor({ className }: CodeEditorProps) {
           channelDotsGutter(),
           insightGutter(),
           currentLineField,
-          python(),
+          compartmentRef.current.of(languageExtension(usePlayerStore.getState().trace?.language)),
           ooccSyntaxHighlighting,
           ooccEditorTheme,
           EditorView.editable.of(false),
@@ -121,6 +128,15 @@ export function CodeEditor({ className }: CodeEditorProps) {
     if (current === sourceCode) return;
     view.dispatch({ changes: { from: 0, to: current.length, insert: sourceCode } });
   }, [sourceCode]);
+
+  // Language selector (docs/PRD.md Phase 4 frontend): reconfigures the
+  // CodeMirror language mode when the loaded trace's language changes,
+  // rather than tearing down and remounting the whole EditorView — a
+  // Compartment reconfigure preserves undo history/scroll/selection,
+  // which a full remount would silently discard.
+  useEffect(() => {
+    viewRef.current?.dispatch({ effects: compartmentRef.current.reconfigure(languageExtension(language)) });
+  }, [language]);
 
   useEffect(() => {
     const view = viewRef.current;
