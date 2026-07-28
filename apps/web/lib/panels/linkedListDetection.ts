@@ -1,4 +1,5 @@
-import type { HeapInstance, Step, Trace } from "@oocc/contracts";
+import type { HeapInstance, Trace } from "@oocc/contracts";
+import { iterateResolvedSteps, type ResolvedStep } from "@/lib/player";
 import { isHeapInstance, isNoneValue, refOf, valueToDisplay } from "./heapValue";
 
 export interface LinkedListNode {
@@ -23,7 +24,7 @@ const MAX_NODES = 200; // guards against a genuine cycle producing an infinite c
 function findPointerField(trace: Trace, typeName: string): string | undefined {
   const candidates = new Set<string>();
   const disqualified = new Set<string>();
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const obj of Object.values(step.heap)) {
       if (!isHeapInstance(obj) || obj.type !== typeName) continue;
       for (const [field, value] of Object.entries(obj.fields)) {
@@ -49,7 +50,7 @@ function findPointerField(trace: Trace, typeName: string): string | undefined {
 /** A primitive field on the node (e.g. `val`), for node labels — the first
  * field that's ever an inline (non-ref) value across the trace. */
 function findLabelField(trace: Trace, typeName: string, pointerField: string): string | undefined {
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const obj of Object.values(step.heap)) {
       if (!isHeapInstance(obj) || obj.type !== typeName) continue;
       for (const [field, value] of Object.entries(obj.fields)) {
@@ -63,14 +64,14 @@ function findLabelField(trace: Trace, typeName: string, pointerField: string): s
 
 export function findPrimaryLinkedListRoot(trace: Trace): string | undefined {
   const typeCounts = new Map<string, number>();
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const obj of Object.values(step.heap)) {
       if (isHeapInstance(obj)) typeCounts.set(obj.type, (typeCounts.get(obj.type) ?? 0) + 1);
     }
   }
   for (const [typeName] of [...typeCounts.entries()].sort((a, b) => b[1] - a[1])) {
     if (findPointerField(trace, typeName)) {
-      for (const step of trace.steps) {
+      for (const step of iterateResolvedSteps(trace)) {
         for (const [ref, obj] of Object.entries(step.heap)) {
           if (isHeapInstance(obj) && obj.type === typeName) return ref;
         }
@@ -82,7 +83,7 @@ export function findPrimaryLinkedListRoot(trace: Trace): string | undefined {
 
 export function computeLinkedListView(
   trace: Trace | null,
-  step: Step | undefined,
+  step: ResolvedStep | undefined,
   binding: string | undefined,
 ): LinkedListView | null {
   if (!trace || !step || !binding) return null;

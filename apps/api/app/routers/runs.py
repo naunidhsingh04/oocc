@@ -16,18 +16,58 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from oocc_contracts import validate_analysis
 from pydantic import BaseModel
 
 from app.agents.graph import run_pipeline_cached
 from app.agents.llm_client import GeminiClient, LLMClient
+from app.auth.user_store import User
 from app.cache import Cache
 from app.executor_client import ExecutorClient
-from app.redis_client import get_cache
+from app.rate_limit import RUNS_PER_IP_PER_MINUTE, RUNS_PER_USER_PER_MINUTE, RateLimiter
+from app.redis_client import get_cache, get_rate_limiter
+from app.routers.auth import get_current_user_optional
 from app.security import ProviderKey, get_provider_key
+from app.storage.wire_codec import encode_keyframed
 
 router = APIRouter()
+
+
+def _client_ip(request: Request) -> str:
+    # Trusts the framework's own resolution (Starlette reads a configured
+    # proxy header when running behind one) rather than reading
+    # `X-Forwarded-For` here directly — this file doesn't know whether this
+    # deployment sits behind a proxy, and a naive header read is itself a
+    # spoofing vector if it *doesn't*.
+    return request.client.host if request.client else "unknown"
+
+
+async def enforce_run_rate_limit(
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+) -> None:
+    ip_result = await limiter.check(
+        f"runs:ip:{_client_ip(request)}", limit=RUNS_PER_IP_PER_MINUTE, window_seconds=60
+    )
+    if not ip_result.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many runs from this address — try again shortly.",
+            headers={"Retry-After": str(ip_result.retry_after_seconds)},
+        )
+
+    if user is not None:
+        user_result = await limiter.check(
+            f"runs:user:{user.id}", limit=RUNS_PER_USER_PER_MINUTE, window_seconds=60
+        )
+        if not user_result.allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many runs from this account — try again shortly.",
+                headers={"Retry-After": str(user_result.retry_after_seconds)},
+            )
 
 
 class RunRequest(BaseModel):
@@ -45,7 +85,7 @@ def get_llm_client(provider_key: ProviderKey = Depends(get_provider_key)) -> LLM
     return GeminiClient(provider_key.reveal())
 
 
-@router.post("/api/runs")
+@router.post("/api/runs", dependencies=[Depends(enforce_run_rate_limit)])
 async def create_run(
     request: RunRequest,
     executor: ExecutorClient = Depends(get_executor_client),
@@ -59,7 +99,12 @@ async def create_run(
         llm_client=llm_client,
         cache=cache,
     )
-    trace = result["trace"]
+    # §3.4 (Phase 6): every deterministic analyzer above already ran against
+    # the raw, full-heap-per-step trace (and that's what's cached — see
+    # app/cache.py and app/storage/wire_codec.py's module docstring). Encode
+    # to the keyframe+patch wire format only now, on the response body itself
+    # — this is the one place the trace actually leaves the process today.
+    trace = encode_keyframed(result["trace"])
 
     analysis = {
         "structures": result["structures"],

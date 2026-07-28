@@ -1,4 +1,5 @@
-import type { HeapInstance, Step, Trace } from "@oocc/contracts";
+import type { HeapInstance, Trace } from "@oocc/contracts";
+import { iterateResolvedSteps, type ResolvedStep } from "@/lib/player";
 import { isHeapInstance, isNoneValue, refOf, valueToDisplay } from "./heapValue";
 
 export interface BinaryTreeNodeData {
@@ -26,7 +27,7 @@ const MAX_NODES = 500;
 function findChildFields(trace: Trace, typeName: string): string[] {
   const candidates = new Set<string>();
   const disqualified = new Set<string>();
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const obj of Object.values(step.heap)) {
       if (!isHeapInstance(obj) || obj.type !== typeName) continue;
       for (const [field, value] of Object.entries(obj.fields)) {
@@ -50,7 +51,7 @@ function findChildFields(trace: Trace, typeName: string): string[] {
 }
 
 function findLabelField(trace: Trace, typeName: string, childFields: string[]): string | undefined {
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const obj of Object.values(step.heap)) {
       if (!isHeapInstance(obj) || obj.type !== typeName) continue;
       for (const [field, value] of Object.entries(obj.fields)) {
@@ -64,14 +65,14 @@ function findLabelField(trace: Trace, typeName: string, childFields: string[]): 
 
 export function findPrimaryBinaryTreeRoot(trace: Trace): string | undefined {
   const typeCounts = new Map<string, number>();
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const obj of Object.values(step.heap)) {
       if (isHeapInstance(obj)) typeCounts.set(obj.type, (typeCounts.get(obj.type) ?? 0) + 1);
     }
   }
   for (const [typeName] of [...typeCounts.entries()].sort((a, b) => b[1] - a[1])) {
     if (findChildFields(trace, typeName).length === 2) {
-      for (const step of trace.steps) {
+      for (const step of iterateResolvedSteps(trace)) {
         for (const [ref, obj] of Object.entries(step.heap)) {
           if (isHeapInstance(obj) && obj.type === typeName) return ref;
         }
@@ -90,7 +91,7 @@ interface RawNode {
 
 function buildRawTree(
   trace: Trace,
-  step: Step,
+  step: ResolvedStep,
   ref: string,
   childFields: string[],
   labelField: string | undefined,
@@ -136,7 +137,7 @@ function layout(node: RawNode, depth: number, nextLeafX: { x: number }, out: Bin
 
 export function computeBinaryTreeView(
   trace: Trace | null,
-  step: Step | undefined,
+  step: ResolvedStep | undefined,
   binding: string | undefined,
 ): BinaryTreeView | null {
   if (!trace || !step || !binding) return null;

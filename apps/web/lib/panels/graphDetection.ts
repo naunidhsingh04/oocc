@@ -1,5 +1,6 @@
 import type { Trace, Value } from "@oocc/contracts";
 import { forceCenter, forceLink, forceManyBody, forceSimulation } from "d3-force";
+import { getStateAt, iterateResolvedSteps } from "@/lib/player";
 import { isHeapDict, isHeapList, valueToDisplay } from "./heapValue";
 
 export interface GraphNode {
@@ -39,7 +40,7 @@ function keyLabel(value: Value): string {
  * `_looks_like_adjacency` rule checks for, independently re-derived here
  * since the frontend has no access to the backend's Python code. */
 export function findPrimaryGraphBinding(trace: Trace): string | undefined {
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const [ref, obj] of Object.entries(step.heap)) {
       if (!isHeapDict(obj) || obj.entries.length === 0) continue;
       const looksLikeAdjacency = obj.entries.every(({ value }) => {
@@ -62,7 +63,7 @@ export function findPrimaryGraphBinding(trace: Trace): string | undefined {
 export function computeGraphLayout(trace: Trace, binding: string): GraphLayout | null {
   const neighborsByNode = new Map<string, Set<string>>();
 
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     const dict = step.heap[binding];
     if (!isHeapDict(dict)) continue;
     for (const { key, value } of dict.entries) {
@@ -136,7 +137,7 @@ export function computeGraphView(
   // single-step flash: once BFS/DFS has touched a node, it stays "visited"
   // as playback continues, exactly like the real algorithm's own visited set.
   for (let i = 0; i <= currentStepIndex; i += 1) {
-    const step = trace.steps[i];
+    const step = getStateAt(trace, i);
     if (!step) continue;
     const touchedNodeIds: string[] = [];
     for (const path of step.changed) {

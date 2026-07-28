@@ -21,16 +21,21 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.agents.digest import compute_digest
 from app.agents.llm_client import GeminiClient, LLMClient
+from app.auth.user_store import User
 from app.rag.concept_store import ConceptStore, PostgresConceptStore
 from app.rag.embeddings import Embedder, GeminiEmbedder
 from app.rag.retrieval import retrieve_top_k
+from app.rate_limit import TUTOR_PER_IP_PER_MINUTE, TUTOR_PER_USER_PER_MINUTE, RateLimiter
+from app.redis_client import get_rate_limiter, get_token_spend_store
+from app.routers.auth import get_current_user, get_current_user_optional
 from app.security import ProviderKey, get_provider_key
+from app.token_spend import TokenSpendStore
 from app.tutor.context import TutorTurn
 from app.tutor.tutor import answer_question
 
@@ -96,12 +101,40 @@ def _sse(event_type: str, data: dict[str, Any]) -> str:
     return f"data: {json.dumps({'type': event_type, **data})}\n\n"
 
 
-@router.post("/api/tutor")
+async def enforce_tutor_rate_limit(
+    http_request: Request,
+    user: User | None = Depends(get_current_user_optional),
+    limiter: RateLimiter = Depends(get_rate_limiter),
+) -> None:
+    ip = http_request.client.host if http_request.client else "unknown"
+    ip_result = await limiter.check(f"tutor:ip:{ip}", limit=TUTOR_PER_IP_PER_MINUTE, window_seconds=60)
+    if not ip_result.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many tutor questions from this address — try again shortly.",
+            headers={"Retry-After": str(ip_result.retry_after_seconds)},
+        )
+
+    if user is not None:
+        user_result = await limiter.check(
+            f"tutor:user:{user.id}", limit=TUTOR_PER_USER_PER_MINUTE, window_seconds=60
+        )
+        if not user_result.allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many tutor questions from this account — try again shortly.",
+                headers={"Retry-After": str(user_result.retry_after_seconds)},
+            )
+
+
+@router.post("/api/tutor", dependencies=[Depends(enforce_tutor_rate_limit)])
 async def tutor_endpoint(
     request: TutorRequest,
     llm_client: LLMClient | None = Depends(get_llm_client_for_tutor),
     embedder: Embedder | None = Depends(get_embedder_for_tutor),
     concept_store: ConceptStore = Depends(get_concept_store),
+    user: User | None = Depends(get_current_user_optional),
+    token_spend_store: TokenSpendStore = Depends(get_token_spend_store),
 ) -> StreamingResponse:
     async def event_stream() -> AsyncIterator[str]:
         if llm_client is None or embedder is None:
@@ -129,6 +162,13 @@ async def tutor_endpoint(
         chunk_size = 40
         for i in range(0, len(result.answer), chunk_size):
             yield _sse("chunk", {"text": result.answer[i : i + chunk_size]})
+        if user is not None and llm_client.last_usage_tokens is not None:
+            # Ops visibility (Phase 6), not billing — see app/token_spend.py's
+            # docstring on why this isn't a ledger. Recorded against the
+            # signed-in user regardless of whose key paid for it (there's no
+            # platform demo key yet to distinguish "costs us" from "costs
+            # them" — see that same docstring).
+            await token_spend_store.record(user.id, llm_client.last_usage_tokens)
         yield _sse(
             "done",
             {
@@ -139,3 +179,23 @@ async def tutor_endpoint(
         )
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.get("/api/tutor/token-spend/me")
+async def get_my_token_spend(
+    user: User = Depends(get_current_user),
+    token_spend_store: TokenSpendStore = Depends(get_token_spend_store),
+    days: int = 30,
+) -> dict[str, Any]:
+    """Phase 6 operations ask: "a view of token spend per user per day."
+    Self-serve (the caller's own spend, not an admin-across-all-users
+    view — there's no admin-role concept in this codebase yet to gate that
+    on) and ops-visibility-grade, not billing-grade — see
+    app/token_spend.py's module docstring for the distinction.
+    """
+    daily = await token_spend_store.get_range(user.id, days=days)
+    return {
+        "user_id": user.id,
+        "daily": [{"day": d.day, "tokens": d.tokens} for d in daily],
+        "total_tokens": sum(d.tokens for d in daily),
+    }

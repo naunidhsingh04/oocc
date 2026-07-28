@@ -1,5 +1,6 @@
-import type { HeapObject, Step, Trace } from "@oocc/contracts";
+import type { HeapObject, Trace } from "@oocc/contracts";
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from "d3-force";
+import { iterateResolvedSteps, type ResolvedStep } from "@/lib/player";
 import { valueToDisplay } from "./heapValue";
 
 export interface HeapObjectBox {
@@ -48,8 +49,8 @@ function labelOf(ref: string, obj: HeapObject): string {
  * superset), frozen into a single layout so aliasing is legible instead of
  * jumping around every step. Memoize on `trace` alone. */
 export function computeHeapObjectsLayout(trace: Trace): HeapObjectsLayout | null {
-  let richestStep: Step | undefined;
-  for (const candidate of trace.steps) {
+  let richestStep: ResolvedStep | undefined;
+  for (const candidate of iterateResolvedSteps(trace)) {
     if (!richestStep || Object.keys(candidate.heap).length > Object.keys(richestStep.heap).length) {
       richestStep = candidate;
     }
@@ -114,7 +115,7 @@ export function computeHeapObjectsLayout(trace: Trace): HeapObjectsLayout | null
   return { boxes, width: WIDTH, height: HEIGHT };
 }
 
-export function computeHeapObjectsView(step: Step | undefined, layout: HeapObjectsLayout): HeapObjectsView {
+export function computeHeapObjectsView(step: ResolvedStep | undefined, layout: HeapObjectsLayout): HeapObjectsView {
   const arrows: HeapObjectArrow[] = [];
   const changedRefs = new Set<string>();
 

@@ -48,7 +48,7 @@ describe("computeArrayView", () => {
     const binding = findPrimaryArrayBinding(trace)!;
 
     // Any step once the array exists should produce a valid, renderable view.
-    const step = trace.steps.find((s) => s.heap[binding]?.type === "list");
+    const step = trace.steps.map((_, i) => getStateAt(trace, i)).find((s) => s?.heap[binding]?.type === "list");
     const view = computeArrayView(step, binding, channels);
 
     expect(view).not.toBeNull();

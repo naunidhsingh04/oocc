@@ -97,7 +97,10 @@ async function generateTypeScript() {
 function freezeRootModels(source, names) {
   let result = source;
   for (const name of names) {
-    const pattern = new RegExp(`(class ${name}\\([\\s\\S]*?\\):\\n)`);
+    // \r?\n, not \n — datamodel-codegen writes CRLF line endings on this
+    // Windows sandbox; a bare \n never matched, so this silently threw
+    // instead of freezing anything the moment gen:contracts first ran here.
+    const pattern = new RegExp(`(class ${name}\\([\\s\\S]*?\\):\\r?\\n)`);
     if (!pattern.test(result)) {
       throw new Error(`freezeRootModels: expected to find "class ${name}(...):" in generated output`);
     }

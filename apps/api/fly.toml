@@ -1,0 +1,35 @@
+# Fly.io deploy config for the API (docs/PRD.md §2 / Phase 6 operations).
+# Deploy from the repo root: `fly deploy --config apps/api/fly.toml
+# --dockerfile apps/api/Dockerfile`. Postgres and Redis are NOT Fly apps —
+# see docs/RUNBOOK.md's "managed services" section: a managed Postgres
+# (Fly Postgres, Supabase, or Neon) and managed Redis (Upstash) via
+# DATABASE_URL/REDIS_URL secrets, never a same-app sidecar.
+app = "oocc-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[env]
+  PORT = "8000"
+  # EXECUTOR_URL, DATABASE_URL, REDIS_URL, TRACE_BUCKET, OOCC_S3_ENDPOINT_URL,
+  # OTEL_EXPORTER_OTLP_ENDPOINT: set via `fly secrets set` (or [env] for
+  # non-secret values only) — never committed here.
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false   # a stopped API machine adds cold-start latency to every user-facing request
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"

@@ -1,5 +1,6 @@
-import type { HeapList, HeapObject, Step, Trace, Value } from "@oocc/contracts";
-import type { ChannelAssignment } from "@/lib/player";
+import type { HeapList, HeapObject, Trace, Value } from "@oocc/contracts";
+import type { ChannelAssignment, ResolvedStep } from "@/lib/player";
+import { iterateResolvedSteps } from "@/lib/player";
 
 export interface ArrayPointer {
   name: string;
@@ -52,7 +53,7 @@ function isPrimitiveList(obj: HeapList): boolean {
  */
 export function findPrimaryArrayBinding(trace: Trace): string | undefined {
   let fallback: string | undefined;
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const [ref, obj] of Object.entries(step.heap)) {
       const list = asHeapList(obj);
       if (!list) continue;
@@ -87,7 +88,7 @@ function inlineNumber(value: Value): number | null {
  * and a `left`/`right` window for quicksort's partition.
  */
 export function computeArrayView(
-  step: Step | undefined,
+  step: ResolvedStep | undefined,
   binding: string | undefined,
   channels: ChannelAssignment,
 ): ArrayView | null {

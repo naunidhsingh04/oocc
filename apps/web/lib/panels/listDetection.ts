@@ -1,4 +1,5 @@
-import type { Step, Trace } from "@oocc/contracts";
+import type { Trace } from "@oocc/contracts";
+import { iterateResolvedSteps, type ResolvedStep } from "@/lib/player";
 import { isHeapList, valueToDisplay } from "./heapValue";
 
 export interface ListItemsView {
@@ -14,7 +15,7 @@ export interface ListItemsView {
  * which already told stack from queue from array by access pattern) —
  * this module only auto-detects as a standalone-render fallback. */
 export function findPrimaryListBinding(trace: Trace): string | undefined {
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const [ref, obj] of Object.entries(step.heap)) {
       if (isHeapList(obj)) return ref;
     }
@@ -23,7 +24,7 @@ export function findPrimaryListBinding(trace: Trace): string | undefined {
 }
 
 export function computeListItemsView(
-  step: Step | undefined,
+  step: ResolvedStep | undefined,
   binding: string | undefined,
 ): ListItemsView | null {
   if (!step || !binding) return null;

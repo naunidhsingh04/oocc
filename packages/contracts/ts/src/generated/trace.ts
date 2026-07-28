@@ -61,11 +61,15 @@ export type Step = {
    */
   stack: [Frame, ...Frame[]];
   /**
-   * Full snapshot of reachable non-primitives at this step, keyed by heap id.
+   * Full snapshot of reachable non-primitives at this step, keyed by heap id. §3.4 (Phase 6): present on keyframe steps only (every 50th step by position, plus step 0). Non-keyframe steps carry `heap_patch` instead — never both, never neither. A trace produced before Phase 6's wire optimization shipped has `heap` on every step and no `heap_patch` at all, which is still a fully valid trace (every step is trivially its own keyframe); consumers must not assume every trace uses the interval scheme.
    */
-  heap: {
+  heap?: {
     [k: string]: HeapObject;
   };
+  /**
+   * §3.4 (Phase 6): an RFC 6902 JSON Patch, `add`/`remove`/`replace` only, from the previous step's *reconstructed* heap to this step's heap. Present on non-keyframe steps instead of `heap`. Paths are JSON Pointers into the heap object, e.g. "/o1/items/4/val". Reconstruct by walking back to the nearest preceding step with `heap` set and applying every intervening step's `heap_patch` in order — see apps/web/lib/player/getStateAt.ts, the one seam every component reads trace state through.
+   */
+  heap_patch?: JsonPatchOp[];
   stdout_delta: string;
   /**
    * Paths mutated since the previous step. Drives every highlight animation — must be exact.
@@ -88,6 +92,19 @@ export type HeapRef = string;
  * A heap-resident value. §3.2 lists list, tuple, dict, set, str (>40 chars), object/instance (fields), function, and the opaque fallback. An object/instance uses its class name as the `type` discriminator (see the worked TreeNode example in §3.2), so `type` is unconstrained beyond excluding the reserved primitive discriminators handled by the other branches.
  */
 export type HeapObject = HeapList | HeapTuple | HeapDict | HeapSet | HeapStr | HeapFunction | HeapOpaque | HeapInstance;
+/**
+ * One RFC 6902 operation. Phase 6's diff only ever emits add/remove/replace (never move/copy/test), so those are the only ops modeled here — a hand-written JSON Patch elsewhere in the trace is not a supported input.
+ */
+export type JsonPatchOp = {
+  [k: string]: unknown;
+} & {
+  op: "add" | "remove" | "replace";
+  /**
+   * A JSON Pointer (RFC 6901).
+   */
+  path: string;
+  value?: unknown;
+};
 /**
  * The `changed` path grammar (§3.2): frame_id.local | oN[index] | oN.field | oN{key}.
  */

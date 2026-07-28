@@ -95,4 +95,17 @@ def compile_to_wasm(
         "-o",
         str(out_wasm),
     ]
-    return subprocess.run(cmd, check=True, capture_output=True, text=True)
+    # timeout=, not left unbounded: a pathological source (deep template
+    # recursion, exponential instantiation) can make clang++ itself hang far
+    # past any reasonable compile — found during Phase 6's security review
+    # (SECURITY.md), which is also why this is a `subprocess.TimeoutExpired`
+    # a caller must handle. 30s is generous headroom over §3.5's own "cold
+    # compile ≤2s p95" target — a legitimate teaching-subset program is
+    # nowhere near this.
+    #
+    # Not `check=True`: this function's only caller (compile_service.py's
+    # compile_source) already inspects `proc.returncode` itself to build a
+    # `CompileResult(ok=False, ...)` — `check=True` would raise
+    # `CalledProcessError` on the very first failing compile instead of ever
+    # reaching that branch, which is dead code as long as this stays True.
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=30)

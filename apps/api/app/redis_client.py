@@ -12,6 +12,8 @@ from typing import Any
 import structlog
 
 from app.cache import Cache, RedisCache
+from app.rate_limit import RateLimitResult, RedisRateLimiter
+from app.token_spend import DailySpend, RedisTokenSpendStore
 
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 
@@ -51,3 +53,81 @@ class _LazyRedisCache:
 
 def get_cache() -> Cache:
     return _LazyRedisCache()
+
+
+class _LazyRedisRateLimiter:
+    """Same "best-effort, never a hard dependency" shape as `_LazyRedisCache`
+    above — a Redis outage fails *open* (the request is allowed), not
+    closed: matching this codebase's existing rule that infra flakiness
+    must never break `POST /api/runs` (see `app/routers/tutor.py`'s and
+    this module's own `_LazyRedisCache` docstrings for the same call made
+    for the deterministic cache and RAG retrieval). A rate limiter that
+    fails closed on a Redis blip would turn "Redis had a bad five minutes"
+    into "the whole product stopped accepting runs," which is a worse
+    outcome than briefly having no rate limiting at all.
+    """
+
+    async def _client(self) -> Any:
+        global _redis_client
+        if _redis_client is None:
+            import redis.asyncio as redis  # type: ignore[import-untyped]
+
+            _redis_client = redis.from_url(os.environ.get("REDIS_URL", DEFAULT_REDIS_URL))
+        return _redis_client
+
+    async def check(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
+        try:
+            limiter = RedisRateLimiter(await self._client())
+            return await limiter.check(key, limit=limit, window_seconds=window_seconds)
+        except Exception as exc:  # noqa: BLE001 — fail open, see class docstring
+            logger.warning("rate_limit.check_failed", error=str(exc))
+            return RateLimitResult(allowed=True, remaining=limit, retry_after_seconds=0)
+
+
+def get_rate_limiter() -> Any:
+    return _LazyRedisRateLimiter()
+
+
+class _LazyRedisTokenSpendStore:
+    """Same lazy-connect, fail-open shape as `_LazyRedisCache`/
+    `_LazyRedisRateLimiter` above: a Redis outage must not turn "we
+    couldn't log a spend metric" into "the tutor stopped answering
+    questions." A failed `record` is silently dropped (a gap in an ops
+    dashboard, not a user-facing failure); a failed `get_range` returns all
+    zeros rather than raising, so the admin view degrades to "no data" note
+    a 500.
+    """
+
+    async def _client(self) -> Any:
+        global _redis_client
+        if _redis_client is None:
+            import redis.asyncio as redis  # type: ignore[import-untyped]
+
+            _redis_client = redis.from_url(os.environ.get("REDIS_URL", DEFAULT_REDIS_URL))
+        return _redis_client
+
+    async def record(self, user_id: str, tokens: int, *, day: str | None = None) -> None:
+        try:
+            store = RedisTokenSpendStore(await self._client())
+            await store.record(user_id, tokens, day=day)
+        except Exception as exc:  # noqa: BLE001 — see class docstring
+            logger.warning("token_spend.record_failed", error=str(exc))
+
+    async def get_range(self, user_id: str, *, days: int) -> list[DailySpend]:
+        try:
+            store = RedisTokenSpendStore(await self._client())
+            return await store.get_range(user_id, days=days)
+        except Exception as exc:  # noqa: BLE001 — see class docstring
+            logger.warning("token_spend.get_range_failed", error=str(exc))
+            from app.token_spend import today_str
+            from datetime import UTC, datetime, timedelta
+
+            now = datetime.now(UTC)
+            return [
+                DailySpend(day=today_str(now - timedelta(days=offset)), tokens=0)
+                for offset in reversed(range(days))
+            ]
+
+
+def get_token_spend_store() -> Any:
+    return _LazyRedisTokenSpendStore()

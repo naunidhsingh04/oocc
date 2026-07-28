@@ -1088,6 +1088,168 @@ behind an `OOCC_TRACE` CMake option. Things later phases must respect:
   always resolve the same way PowerShell does — prefer PowerShell for
   actually *running* a built native/WASM artifact in this environment.
 
+## Phase 6 backend, part 1: wire optimisation, security review, operations (done)
+
+Three tracks: §3.4's keyframe+patch wire format shipped, PRD §5's
+adversarial suite finally got written (it never existed despite Phase 1's
+own brief calling for it), and baseline operations (rate limits, tracing,
+token spend, load test, backup/restore, deploy configs) landed. Full
+detail lives in two new root-level docs this phase produced —
+`SECURITY.md` (the adversarial review, read it before touching the
+sandbox or the C++ instrumentation pass again) and `docs/RUNBOOK.md` (the
+operations reference) — this section is only what future sessions need to
+not re-break.
+
+- **The keyframe/patch encoding happens exactly once, at the last moment
+  a trace leaves the process** (`app/storage/wire_codec.py`, called from
+  `routers/runs.py` right before the response is built) — never inside
+  `run_pipeline`. Every deterministic analyzer
+  (`digest`/`structure_detector`/`insight_scanner`/`complexity_analyst`/
+  `heap_graph`) still runs against the raw, full-heap-per-step trace, and
+  so does the Redis deterministic-output cache (`app/cache.py`) — decoding
+  before analysis, or caching the encoded form, would both be real bugs.
+  `trace.schema.json` bumped to acknowledge `heap`/`heap_patch` as mutually
+  exclusive per-step fields (schema_version unchanged at "1.1" territory,
+  additive per the append-only rule) — a step with `heap` is a keyframe; a
+  trace with `heap` on *every* step (every fixture committed before this
+  phase, and any trace produced before this shipped) is still fully valid,
+  trivially "every step is its own keyframe."
+- **Measured, not assumed, and the honest number surprised**: the
+  PRD-named `large_trace_40k` fixture shows ~0% reduction (it's a
+  step-*count* stress fixture with an empty heap on every step — nothing
+  to diff), while a representative heap-heavy synthetic trace (bubble sort,
+  300 elements) shows ~65% smaller gzip'd payload. Both numbers, and why
+  they differ, are in `apps/api/scripts/measure_wire_savings.py`'s own
+  output and `apps/api/tests/storage/test_wire_codec.py`'s two separate
+  test classes — don't cite the 40k fixture's number as "the win," it isn't
+  representative of what this feature targets.
+- **`apps/web/lib/player/getStateAt.ts` absorbed this exactly as designed**
+  (the seam PRD §3.4 called out from Phase 1) — but every `lib/panels/
+  *Detection.ts` module that scans the *whole* trace once to auto-detect a
+  binding (`findPrimaryArrayBinding` and its siblings for hash maps, linked
+  lists, binary trees, graphs, 2D arrays, heap objects) had to switch from
+  iterating `trace.steps` directly to `iterateResolvedSteps(trace)` (new,
+  `getStateAt.ts`) — those functions need real heap data at *every*
+  position, not just keyframes, which `trace.steps[i].heap` no longer
+  guarantees. `ResolvedStep` (also new, `getStateAt.ts`) is the "heap
+  guaranteed present" type every panel/detection function should take
+  instead of the raw `@oocc/contracts` `Step` type from here on.
+  `getStateAt` itself keeps a single-slot memo (last `(trace, i)` pair) so
+  multiple panels reading the same current step in one render pass get the
+  same object reference — returning a fresh object every call would be the
+  same class of bug as the Phase 3 frontend's `EMPTY_INSIGHTS` fresh-array
+  fix, just for a different selector shape.
+- **Two real, unrelated bugs this phase's own testing surfaced and fixed**,
+  neither about wire optimisation: (1) `services/executor/executor_app/
+  tracer.py` blew Python's recursion limit encoding a *module* object
+  bound as a local (`import random` → `random` in scope) — the generic
+  `hasattr(obj, "__dict__")` heap-encoding branch walked the entire module
+  namespace; fixed by special-casing `types.ModuleType` to `opaque`, same
+  as a class object already was one branch above it. (2) `pnpm
+  gen:contracts` silently failed to freeze root models (`HeapRef` etc.)
+  on this Windows sandbox — `datamodel-codegen` writes CRLF line endings
+  here, and `generate.mjs`'s regex only ever matched a bare `\n`; fixed to
+  `\r?\n`. Neither was caused by this phase's schema edits — both were
+  latent and found by actually running the tooling.
+- **The Python sandbox has zero OS-level isolation deployed** — this was
+  already true and already documented in `services/executor/executor_app/
+  main.py`'s own docstring; this phase is what actually verified it against
+  live adversarial input for the first time (see `SECURITY.md` §1). What
+  shipped this phase is Python-level defense-in-depth on top of that
+  absent boundary, not a replacement for it: an import allowlist
+  (`services/executor/executor_app/sandbox_imports.py` — allowlist, not
+  PRD's literal five-module blocklist, since a blocklist only stops named
+  modules) and `open()` removed from builtins entirely. **The classic
+  `().__class__.__bases__[0].__subclasses__()` sandbox-escape bypass still
+  works** (a regression-guarded test proves it, deliberately, so nobody
+  mistakes a future unrelated change for having closed it) — gVisor/nsjail
+  is still the real fix and is still unbuilt. Don't add more Python-level
+  patches here expecting them to close that gap; they can't.
+- **The C++ path had no adversarial coverage at all before this phase, and
+  its most severe finding is a native process crash, not a Python
+  exception**: a 40,000-term flat expression chain (`x = x + 1 + 1 + ...`,
+  well under any reasonable size cap) overflows libclang's own parser
+  stack — a hard crash that unwinds past any `try/except` because the
+  fault is in the native library. `instrument()` itself is unchanged and
+  still the direct-call, no-isolation entrypoint for its own fast unit
+  tests (`test_instrument.py`) — **`instrument_isolated()`** (new, same
+  file) is what `compile_service.py` actually calls now: runs the parse in
+  a `multiprocessing` (spawn context — required on Windows, safer
+  everywhere given libclang's global native state) child, and turns a
+  crashed or timed-out child into an ordinary `resource_limit` diagnostic
+  instead of taking the whole compile service down with it. Also fixed
+  alongside this: `_ensure_libclang_configured()` only ever probed
+  hardcoded macOS/Linux system paths with no fallback to the `libclang`
+  PyPI package's own bundled native library, so this entire module had
+  never actually run on this Windows sandbox until this phase — a
+  portability bug, not a security one, but it meant zero of this code path
+  had ever been exercised outside its original macOS session.
+  `toolchain.py`'s/`compile_service.py`'s clang++ subprocess calls also had
+  no timeout at all before this phase (a measured quadratic-time
+  compile-bomb risk, `MAX_SOURCE_BYTES` mitigates but doesn't fix the
+  underlying algorithm) — see `SECURITY.md` §2 for the full writeup,
+  including what's still unverified because this sandbox has no wasi-sdk
+  toolchain to actually compile with.
+- **Rate limiting** (`app/rate_limit.py`, Redis fixed-window, fail-open on
+  a Redis outage — same "never break `POST /api/runs`" rule every other
+  Redis-backed piece of this codebase already follows) sits on both
+  `/api/runs` and `/api/tutor`, per-IP and per-authenticated-user. Every
+  test that hits either route through the real FastAPI `app` needs the
+  rate limiter and token-spend store overridden to their `InMemory*` fakes
+  or it tries (and, thanks to the fail-open path, eventually gives up
+  failing) a real Redis connection on every request — `apps/api/tests/
+  conftest.py`'s `_fake_rate_limiter_and_token_spend_store` autouse fixture
+  does this globally so individual test files don't each have to remember.
+- **Token spend** (`app/token_spend.py`) is ops visibility, not a billing
+  ledger — recorded per signed-in user per day regardless of whose
+  provider key actually paid, since there's still no platform-held demo
+  key (PRD §4.5) to distinguish "costs the platform" from "costs the
+  user." View: `GET /api/tutor/token-spend/me`.
+- **OpenTelemetry** (`app/telemetry.py`) auto-instruments every FastAPI
+  route and wraps every `app/agents/graph.py` node in its own
+  `agent.<name>` span. Additive only, same as the Redis-backed pieces —
+  `configure_telemetry()` with no `OTEL_EXPORTER_OTLP_ENDPOINT` set creates
+  spans that go nowhere rather than requiring a reachable collector.
+  **Gotcha hit building this**: `TracerProvider`'s first positional arg is
+  `sampler`, not `resource` — `TracerProvider(Resource.create(...))`
+  compiles fine and fails at the first span with `AttributeError:
+  'Resource' object has no attribute 'should_sample'`; must be
+  `TracerProvider(resource=Resource.create(...))`.
+- **The run endpoint's real concurrency ceiling was load tested for
+  real, not modeled, and the result is the operationally important
+  finding of this whole phase**: `services/executor/executor_app/main.py`
+  runs the tracer fully synchronously inside an `async def` route with no
+  `await asyncio.to_thread(...)` and no queue, so a single uvicorn process
+  serializes every execution — 100 concurrent requests against a single
+  process took the server well over a minute to drain, and it stopped
+  responding to `/health` for most of that window. See `docs/RUNBOOK.md`
+  §4 for the full numbers and the three real fixes (`--workers`, a real
+  job queue, or the per-run sandboxed-container work gVisor/nsjail would
+  need anyway) — none attempted this session; this is a load-bearing
+  capacity constraint for whoever deploys this next, not a bug with a
+  one-line patch.
+- **Postgres backup/restore was actually drilled, not just scripted**:
+  seeded a real local Postgres 18 across 7 of PRD §8's 9 tables (`
+  concept_chunks` needs `pgvector`, unavailable in this sandbox),
+  `pg_dump`'d, fingerprinted (row counts + an md5 hash), **dropped the
+  database entirely**, restored from the dump file alone, and confirmed
+  the fingerprint matched exactly — including array columns, JSONB, and
+  foreign keys. `apps/api/scripts/backup_postgres.sh` /
+  `restore_postgres.sh` are the reusable commands; `docs/RUNBOOK.md` §7 has
+  the full record. Re-run this drill after any schema migration, not just
+  once.
+- **Deploy configs** (`apps/api/fly.toml`, `apps/web/fly.toml`,
+  `services/executor/fly.toml`) target Fly.io, per PRD §6's "Fly.io or
+  Railway" — the executor is deliberately its own Fly app reachable only
+  over private networking, never a public hostname, matching "executor on
+  its own machines." Every config's own top comment says what it does and
+  doesn't cover — the executor's especially: the Fly Machines boundary is
+  real VM-level isolation *between machines*, not the gVisor/nsjail
+  per-run isolation *within* one long-lived machine that SECURITY.md still
+  calls the top follow-up. Postgres/Redis are managed services referenced
+  by env var, never a same-app sidecar; traces go to R2/S3 via the
+  already-existing `S3TraceStore`.
+
 ## Tests ship with the code they test
 
 No follow-up PR to "add tests later." If it's worth writing, it's worth a

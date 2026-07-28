@@ -1,4 +1,5 @@
-import type { Step, Trace } from "@oocc/contracts";
+import type { Trace } from "@oocc/contracts";
+import { iterateResolvedSteps, type ResolvedStep } from "@/lib/player";
 import { isHeapDict, valueToDisplay } from "./heapValue";
 
 const BUCKET_COUNT = 8;
@@ -16,7 +17,7 @@ export interface HashMapView {
 }
 
 export function findPrimaryHashMapBinding(trace: Trace): string | undefined {
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const [ref, obj] of Object.entries(step.heap)) {
       if (isHeapDict(obj)) return ref;
     }
@@ -37,7 +38,7 @@ function bucketFor(keyLabel: string): number {
 }
 
 export function computeHashMapView(
-  step: Step | undefined,
+  step: ResolvedStep | undefined,
   binding: string | undefined,
 ): HashMapView | null {
   if (!step || !binding) return null;

@@ -32,12 +32,15 @@ from app.analysis.insight_scanner import scan_insights
 from app.analysis.structure_detector import detect_structures
 from app.analysis.viz_planner import plan_viz
 from app.cache import Cache, cache_key
+from app.telemetry import traced_node
 
 
+@traced_node("digest")
 async def _digest_node(state: PipelineState) -> dict[str, Any]:
     return {"digest": compute_digest(state["trace"])}
 
 
+@traced_node("structure_detector")
 async def _structure_detector_node(state: PipelineState) -> dict[str, Any]:
     structures = detect_structures(state["trace"])
     structures = await reclassify_low_confidence(
@@ -48,12 +51,14 @@ async def _structure_detector_node(state: PipelineState) -> dict[str, Any]:
     return {"structures": structures}
 
 
+@traced_node("insight_scanner")
 async def _insight_scanner_node(state: PipelineState) -> dict[str, Any]:
     insights = scan_insights(state["trace"], state["source"])
     narrations = await narrate_insights(insights=insights, llm_client=state.get("llm_client"))
     return {"insights": insights, "insight_narrations": narrations}
 
 
+@traced_node("complexity_analyst")
 async def _complexity_analyst_node(state: PipelineState) -> dict[str, Any]:
     complexity = await analyze_complexity(state["source"], state["executor"])
     narration = await narrate_complexity(
@@ -62,6 +67,7 @@ async def _complexity_analyst_node(state: PipelineState) -> dict[str, Any]:
     return {"complexity": complexity, "complexity_narration": narration}
 
 
+@traced_node("algorithm_classifier")
 async def _algorithm_classifier_node(state: PipelineState) -> dict[str, Any]:
     algorithm = await classify_algorithm(
         digest=state["digest"],
@@ -72,12 +78,14 @@ async def _algorithm_classifier_node(state: PipelineState) -> dict[str, Any]:
     return {"algorithm": algorithm}
 
 
+@traced_node("viz_planner")
 async def _viz_planner_node(state: PipelineState) -> dict[str, Any]:
     plan = plan_viz(state["source"], state["structures"], state["trace"])
     summary = await narrate_plan(plan=plan, llm_client=state.get("llm_client"))
     return {"plan": plan, "plan_summary": summary}
 
 
+@traced_node("narrator")
 async def _narrator_node(state: PipelineState) -> dict[str, Any]:
     narration = await narrator_module.narrate_step_ranges(
         digest=state["digest"], llm_client=state.get("llm_client")

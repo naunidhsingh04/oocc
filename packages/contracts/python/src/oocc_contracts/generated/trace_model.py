@@ -114,6 +114,25 @@ class ChangedPath(RootModel[str]):
     ]
 
 
+class Op(StrEnum):
+    add = 'add'
+    remove = 'remove'
+    replace = 'replace'
+
+
+class JsonPatchOp(BaseModel):
+    """
+    One RFC 6902 operation. Phase 6's diff only ever emits add/remove/replace (never move/copy/test), so those are the only ops modeled here — a hand-written JSON Patch elsewhere in the trace is not a supported input.
+    """
+
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+    op: Op
+    path: Annotated[str, Field(description='A JSON Pointer (RFC 6901).')]
+    value: Any | None = None
+
+
 class StepEvent(StrEnum):
     line = 'line'
     call = 'call'
@@ -304,11 +323,17 @@ class Step(BaseModel):
     depth: Annotated[int, Field(description='Call stack depth.', ge=0)]
     stack: Annotated[list[Frame], Field(min_length=1)]
     heap: Annotated[
-        dict[HeapRef, HeapObject],
+        dict[HeapRef, HeapObject] | None,
         Field(
-            description='Full snapshot of reachable non-primitives at this step, keyed by heap id.'
+            description="Full snapshot of reachable non-primitives at this step, keyed by heap id. §3.4 (Phase 6): present on keyframe steps only (every 50th step by position, plus step 0). Non-keyframe steps carry `heap_patch` instead — never both, never neither. A trace produced before Phase 6's wire optimization shipped has `heap` on every step and no `heap_patch` at all, which is still a fully valid trace (every step is trivially its own keyframe); consumers must not assume every trace uses the interval scheme."
         ),
-    ]
+    ] = None
+    heap_patch: Annotated[
+        list[JsonPatchOp] | None,
+        Field(
+            description='§3.4 (Phase 6): an RFC 6902 JSON Patch, `add`/`remove`/`replace` only, from the previous step\'s *reconstructed* heap to this step\'s heap. Present on non-keyframe steps instead of `heap`. Paths are JSON Pointers into the heap object, e.g. "/o1/items/4/val". Reconstruct by walking back to the nearest preceding step with `heap` set and applying every intervening step\'s `heap_patch` in order — see apps/web/lib/player/getStateAt.ts, the one seam every component reads trace state through.'
+        ),
+    ] = None
     stdout_delta: str
     changed: Annotated[
         list[ChangedPath],
@@ -337,7 +362,7 @@ class Trace(BaseModel):
         str,
         Field(
             description='Contract version, e.g. "1.0". Bump the minor component for additive changes.',
-            examples=['1.0'],
+            examples=['1.0', '1.1'],
             pattern='^[0-9]+\\.[0-9]+$',
         ),
     ]

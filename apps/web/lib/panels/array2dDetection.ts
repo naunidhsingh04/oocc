@@ -1,4 +1,5 @@
-import type { Step, Trace } from "@oocc/contracts";
+import type { Trace } from "@oocc/contracts";
+import { iterateResolvedSteps, type ResolvedStep } from "@/lib/player";
 import { isHeapList, valueToDisplay } from "./heapValue";
 
 export interface Array2DView {
@@ -12,7 +13,7 @@ export interface Array2DView {
  * arrayDetection's findPrimaryArrayBinding but one level up: a HeapList
  * whose items are themselves refs to HeapLists. */
 export function findPrimaryArray2DBinding(trace: Trace): string | undefined {
-  for (const step of trace.steps) {
+  for (const step of iterateResolvedSteps(trace)) {
     for (const [ref, obj] of Object.entries(step.heap)) {
       if (!isHeapList(obj) || obj.items.length === 0) continue;
       const rowsAreLists = obj.items.every(
@@ -25,7 +26,7 @@ export function findPrimaryArray2DBinding(trace: Trace): string | undefined {
 }
 
 export function computeArray2DView(
-  step: Step | undefined,
+  step: ResolvedStep | undefined,
   binding: string | undefined,
 ): Array2DView | null {
   if (!step || !binding) return null;

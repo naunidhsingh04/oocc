@@ -18,12 +18,16 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import io
+import random
 import sys
 import time
 import traceback as traceback_module
+import types
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
+
+from executor_app.sandbox_imports import restricted_builtins
 
 USER_CODE_FILENAME = "<oocc-user>"
 TOOL_ID = 3  # PEP 669: ids 0-5 exist; 0,1,2,5 are conventional names for
@@ -110,8 +114,16 @@ class Tracer:
         run_globals: dict[str, Any] = {
             "__name__": "__main__",
             "__doc__": None,
-            "__builtins__": __builtins__,
+            "__builtins__": restricted_builtins(),
         }
+        # Seeded, not left to the real OS entropy source: docs/PRD.md §5's
+        # "random (seeded)" and, separately, what the deterministic-output
+        # cache (apps/api/app/cache.py) already assumes — a cache hit serves
+        # a previous run's trace back for identical (source, stdin), which
+        # is only honest if the same source actually produces the same
+        # trace every time. Seeded from the source text itself so different
+        # programs still get different-looking sequences.
+        random.seed(source_hash)
 
         events = sys.monitoring.events
         sys.monitoring.use_tool_id(TOOL_ID, "oocc-executor-tracer")
@@ -399,6 +411,16 @@ class Tracer:
             # heap-type registry, so it degrades honestly to opaque rather
             # than claiming a type it isn't.
             return {"type": "opaque", "repr": _safe_repr(obj)}
+        if isinstance(obj, types.ModuleType):
+            # `import random` binds `random` as a local — without this,
+            # the generic `hasattr(obj, "__dict__")` branch below walks the
+            # *entire* module namespace (every function, every submodule,
+            # `__builtins__`, `__loader__`'s importlib internals...), which
+            # is deep enough to blow Python's default recursion limit before
+            # it ever finishes (found by this file's own adversarial test
+            # suite — see SECURITY.md). A module is never one of §3.2's
+            # heap types anyway; nobody visualizes a module's internals.
+            return {"type": "opaque", "repr": f"<module '{obj.__name__}'>"}
         if callable(obj) and (hasattr(obj, "__name__")):
             return {
                 "type": "function",
@@ -509,8 +531,9 @@ class CounterTracer:
         run_globals: dict[str, Any] = {
             "__name__": "__main__",
             "__doc__": None,
-            "__builtins__": __builtins__,
+            "__builtins__": restricted_builtins(),
         }
+        random.seed(hashlib.sha256(source.encode()).hexdigest())
 
         events = sys.monitoring.events
         sys.monitoring.use_tool_id(TOOL_ID, "oocc-executor-counter")

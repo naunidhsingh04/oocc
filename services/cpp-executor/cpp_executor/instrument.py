@@ -26,6 +26,7 @@ import hashlib
 import itertools
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import clang.cindex as ci
 
@@ -41,14 +42,40 @@ UNSUPPORTED_CURSOR_KINDS = {
 }
 
 
+def _bundled_libclang_path() -> str | None:
+    """The `libclang` PyPI package (this project's pyproject.toml dependency)
+    ships its own prebuilt native library — portable across whatever OS `uv
+    sync` actually ran on, unlike the hardcoded system paths below, which
+    only ever matched the original macOS dev sandbox this pass was built in
+    and silently broke this entire module on every other OS (found running
+    this Windows sandbox's own security-review adversarial suite: every
+    single parse attempt failed with a `LibclangError` pointing at a
+    macOS-only path that obviously doesn't exist here — a portability bug,
+    not a security one, but one that means the pass never ran at all)."""
+    try:
+        import clang.native
+    except ImportError:
+        return None
+    native_dir = Path(clang.native.__file__).parent
+    for name in ("libclang.dll", "libclang.so", "libclang.dylib"):
+        candidate = native_dir / name
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def _ensure_libclang_configured() -> None:
     if ci.Config.loaded:
         return
-    for candidate in (
+    candidates = [
+        _bundled_libclang_path(),
         "/Library/Developer/CommandLineTools/usr/lib/libclang.dylib",
         "/usr/lib/llvm-14/lib/libclang.so",
         "/usr/lib/x86_64-linux-gnu/libclang.so",
-    ):
+    ]
+    for candidate in candidates:
+        if not candidate or not Path(candidate).exists():
+            continue
         try:
             ci.Config.set_library_file(candidate)
             return
@@ -292,9 +319,44 @@ def _rewrite_raw_allocator_calls(source: str) -> str:
     return re.sub(pattern, repl, source)
 
 
+MAX_SOURCE_BYTES = 200_000  # ~5,000 lines of realistic teaching-subset code
+
 def instrument(
     source: str, *, run_id: str, extra_clang_args: list[str] | None = None
 ) -> InstrumentResult:
+    # Measured during Phase 6's security review (SECURITY.md): this pass's
+    # own AST walk scales quadratically with translation-unit size — 2,000
+    # trivial one-line functions instruments in ~2s, 5,000 in ~15s, and
+    # 20,000 (still a small file, well inside a plausible generated/obfuscated
+    # submission) didn't finish in 30s. Nothing downstream caps compile time
+    # either (toolchain.py's subprocess timeout bounds *clang*, not this
+    # pure-Python pass that runs before clang ever sees the source), so this
+    # is a real, unbounded DoS vector on its own. The quadratic algorithm
+    # itself wasn't safe to rewrite in this pass without a working compile
+    # toolchain in this sandbox to verify no output regression — this cap
+    # is the contained mitigation: reject before the expensive walk starts,
+    # with a clear diagnostic, at a size no legitimate teaching-subset
+    # program (the twelve/six fixtures are all under 2KB) comes close to.
+    if len(source.encode("utf-8", errors="surrogatepass")) > MAX_SOURCE_BYTES:
+        # Deliberately not kind="unsupported_construct": compile_service.py's
+        # `untraced_offer` treats that kind as "safe to compile without the
+        # pass, just without step data" — but compile_untraced sends the
+        # source straight to clang++ with no size check of its own, so
+        # offering that fallback here would hand the same oversized source
+        # right back to clang, the exact thing this cap exists to prevent.
+        return InstrumentResult(
+            ok=False,
+            diagnostics=[
+                Diagnostic(
+                    kind="resource_limit",
+                    message=(
+                        f"This program is larger than OOCC's {MAX_SOURCE_BYTES:,}-byte "
+                        "teaching-subset limit and can't be traced."
+                    ),
+                )
+            ],
+        )
+
     _ensure_libclang_configured()
     filename = "<oocc-user>.cpp"
 
@@ -425,3 +487,82 @@ def instrument(
 def _cpp_string_literal(s: str) -> str:
     escaped = s.replace("\\", "\\\\").replace('"', '\\"')
     return '"' + escaped + '"'
+
+
+def _instrument_worker(
+    source: str,
+    run_id: str,
+    extra_clang_args: list[str] | None,
+    result_queue: "multiprocessing.Queue[InstrumentResult]",
+) -> None:
+    result_queue.put(instrument(source, run_id=run_id, extra_clang_args=extra_clang_args))
+
+
+def instrument_isolated(
+    source: str,
+    *,
+    run_id: str,
+    extra_clang_args: list[str] | None = None,
+    timeout_s: float = 20.0,
+) -> InstrumentResult:
+    """`instrument()`, run in a child process — the safe public entrypoint;
+    `compile_service.py` calls this, never `instrument()` directly.
+
+    Found during Phase 6's security review (SECURITY.md): a source well
+    under `MAX_SOURCE_BYTES` (a ~40,000-term flat `x + 1 + 1 + ...` chain,
+    160KB) crashes libclang's native parser outright — a stack overflow in
+    the recursive-descent expression parser, confirmed by the child process
+    exiting with an abnormal status code and zero output, not a Python
+    exception `instrument()` could ever catch itself (a hard native crash
+    unwinds past any `try/except` in the same process). Clang's parser does
+    guard *bracket* nesting explicitly (a clean "bracket nesting level
+    exceeded maximum of 256" diagnostic, confirmed separately) but not a
+    flat operator chain's expression-tree depth — closing that specific gap
+    would mean either patching/wrapping libclang itself or reimplementing
+    depth-limited expression parsing, neither of which fits this session.
+    Process isolation is the general fix: whatever pathological AST shape
+    crashes the parser next, it takes down one throwaway child, never the
+    compile service itself.
+
+    `multiprocessing`'s spawn context, not fork: this pass loads a native
+    library (libclang) with global C state, and Windows only supports spawn
+    anyway — using the same context on every platform means one code path,
+    not "works on Linux, silently different on Windows."
+    """
+    import multiprocessing
+
+    ctx = multiprocessing.get_context("spawn")
+    result_queue: "multiprocessing.Queue[InstrumentResult]" = ctx.Queue()
+    process = ctx.Process(
+        target=_instrument_worker, args=(source, run_id, extra_clang_args, result_queue)
+    )
+    process.start()
+    process.join(timeout_s)
+
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        return InstrumentResult(
+            ok=False,
+            diagnostics=[
+                Diagnostic(kind="resource_limit", message=f"Parsing timed out after {timeout_s:.0f}s.")
+            ],
+        )
+
+    if process.exitcode != 0:
+        return InstrumentResult(
+            ok=False,
+            diagnostics=[
+                Diagnostic(
+                    kind="resource_limit",
+                    message=(
+                        "The parser crashed on this program (exit code "
+                        f"{process.exitcode}) — this is usually a pathologically "
+                        "deep expression or declaration OOCC's teaching subset "
+                        "can't handle."
+                    ),
+                )
+            ],
+        )
+
+    return result_queue.get()

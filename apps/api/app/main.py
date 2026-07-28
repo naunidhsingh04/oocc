@@ -25,11 +25,20 @@ from app.routers.progress import router as progress_router
 from app.routers.runs import router as runs_router
 from app.routers.settings import router as settings_router
 from app.routers.tutor import router as tutor_router
+from app.telemetry import configure_telemetry
 
 configure_logging()
+configure_telemetry()
 logger = structlog.get_logger("oocc.api")
 
 app = FastAPI(title="OOCC API")
+
+# Auto-instruments every route with a span (method, path, status code) —
+# additive only; see app/telemetry.py's docstring for why this never
+# becomes a hard dependency on a reachable collector.
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor  # noqa: E402
+
+FastAPIInstrumentor.instrument_app(app)
 
 _DEFAULT_CORS_ORIGINS = "http://localhost:3000"
 cors_origins = [

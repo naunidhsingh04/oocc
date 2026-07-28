@@ -45,7 +45,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .instrument import Diagnostic, instrument, source_hash
+from .instrument import MAX_SOURCE_BYTES, Diagnostic, instrument_isolated, source_hash
 from .toolchain import _require_sdk, compile_to_wasm, wasi_clang_args
 
 DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / ".compile_cache"
@@ -80,7 +80,9 @@ def compile_source(
     if cached.exists():
         return CompileResult(ok=True, wasm_bytes=cached.read_bytes(), from_cache=True)
 
-    result = instrument(source, run_id=PLACEHOLDER_RUN_ID, extra_clang_args=wasi_clang_args())
+    result = instrument_isolated(
+        source, run_id=PLACEHOLDER_RUN_ID, extra_clang_args=wasi_clang_args()
+    )
     if not result.ok:
         untraced_offer = bool(result.diagnostics) and all(
             d.kind == "unsupported_construct" for d in result.diagnostics
@@ -101,7 +103,17 @@ def compile_source(
     fd, tmp_name = tempfile.mkstemp(dir=cache_dir, suffix=".tmp.wasm")
     os.close(fd)
     out_wasm = Path(tmp_name)
-    proc = compile_to_wasm(result.instrumented_source, out_wasm)
+    try:
+        proc = compile_to_wasm(result.instrumented_source, out_wasm)
+    except subprocess.TimeoutExpired:
+        out_wasm.unlink(missing_ok=True)
+        out_wasm.with_suffix(".instrumented.cpp").unlink(missing_ok=True)
+        return CompileResult(
+            ok=False,
+            diagnostics=[
+                Diagnostic(kind="compile_error", message="Compilation timed out after 30s.")
+            ],
+        )
     if proc.returncode != 0:
         out_wasm.unlink(missing_ok=True)
         out_wasm.with_suffix(".instrumented.cpp").unlink(missing_ok=True)
@@ -121,7 +133,29 @@ def compile_untraced(source: str, *, cache_dir: Path = DEFAULT_CACHE_DIR) -> Com
     runtime, no injected calls, no trace. Callers use this after
     compile_source reports untraced_offer=True and the user accepts running
     without step data (PRD §3.5: "Offer to run it untraced rather than
-    refusing.")."""
+    refusing.").
+
+    Enforces the same size cap `instrument()` does (SECURITY.md, Phase 6
+    security review), independently: this is a separate public entrypoint,
+    not exclusively reachable through `compile_source`'s own check, and
+    clang++ itself has no source-size guard of its own — only a subprocess
+    timeout (toolchain.py's `compile_to_wasm`; this function's own subprocess
+    call has the identical timeout for the identical reason).
+    """
+    if len(source.encode("utf-8", errors="surrogatepass")) > MAX_SOURCE_BYTES:
+        return CompileResult(
+            ok=False,
+            diagnostics=[
+                Diagnostic(
+                    kind="resource_limit",
+                    message=(
+                        f"This program is larger than OOCC's {MAX_SOURCE_BYTES:,}-byte "
+                        "teaching-subset limit and can't be compiled."
+                    ),
+                )
+            ],
+        )
+
     hash_ = source_hash(source) + ":untraced"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cached = _cache_path(cache_dir, hash_, ".wasm")
@@ -138,19 +172,36 @@ def compile_untraced(source: str, *, cache_dir: Path = DEFAULT_CACHE_DIR) -> Com
 
     sdk = _require_sdk()
 
-    proc = subprocess.run(
-        [
-            str(sdk / "bin" / "clang++"),
-            "-std=c++17",
-            f"--sysroot={sdk / 'share' / 'wasi-sysroot'}",
-            "-O1",
-            str(src_path),
-            "-o",
-            str(out_wasm),
-        ],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        # timeout=: this compiles the user's *original*, uninstrumented
+        # source directly — none of instrument()'s own parse-time diagnostics
+        # (deep-template rejection included) run on this path, so a
+        # pathological source that reaches here via the "run it untraced"
+        # offer has nothing else standing between it and an indefinitely
+        # hung clang++ (see SECURITY.md, Phase 6 security review).
+        proc = subprocess.run(
+            [
+                str(sdk / "bin" / "clang++"),
+                "-std=c++17",
+                f"--sysroot={sdk / 'share' / 'wasi-sysroot'}",
+                "-O1",
+                str(src_path),
+                "-o",
+                str(out_wasm),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        src_path.unlink(missing_ok=True)
+        out_wasm.unlink(missing_ok=True)
+        return CompileResult(
+            ok=False,
+            diagnostics=[
+                Diagnostic(kind="compile_error", message="Compilation timed out after 30s.")
+            ],
+        )
     src_path.unlink(missing_ok=True)
     if proc.returncode != 0:
         out_wasm.unlink(missing_ok=True)

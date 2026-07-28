@@ -1,0 +1,50 @@
+# Fly.io deploy config for the executor (docs/PRD.md §5). Deployed as its
+# own Fly app — "executor on its own machines," never sharing a machine or
+# process with the API — precisely because it is the one place untrusted
+# user code runs. Deploy: `fly deploy --config services/executor/fly.toml
+# --dockerfile services/executor/Dockerfile`.
+#
+# IMPORTANT, see SECURITY.md's §1.1: this config alone is NOT the sandbox
+# boundary. Fly Machines are Firecracker VMs (real hardware-level isolation
+# between *machines*), which is a real improvement over "no isolation at
+# all" — but nothing here adds gVisor/nsjail, a per-run container, or the
+# `--network none`/cgroup limits PRD §5 specifies *within* one running
+# machine. A single long-lived executor machine still runs every request's
+# `exec()` in the same OS process today. Closing that gap (one throwaway
+# sandboxed container per run, not one long-lived machine serving many
+# requests) is the top follow-up SECURITY.md names — this file describes
+# where the service runs, not that its internal isolation problem is solved.
+app = "oocc-executor"
+primary_region = "iad"
+
+[build]
+  dockerfile = "services/executor/Dockerfile"
+
+[env]
+  PORT = "8001"
+
+# No public HTTP service block: the executor is only ever reached from the
+# API over Fly's private networking (6PN), never from the public internet
+# directly — `EXECUTOR_URL` on the API app points at
+# `oocc-executor.internal:8001`, not a public hostname.
+[[services]]
+  internal_port = 8001
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 8001
+    handlers = ["http"]
+
+  [[services.tcp_checks]]
+    grace_period = "10s"
+    interval = "15s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1gb"
+  # cpu_kind = "performance" once real user traffic needs the isolation
+  # headroom — shared-cpu is fine for this sandbox-dev-verified baseline.
