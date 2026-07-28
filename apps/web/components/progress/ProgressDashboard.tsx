@@ -1,0 +1,83 @@
+"use client";
+
+import { fetchProgress, fetchReviewQueue } from "@/lib/progress/api";
+import { buildDemoProgressRecords } from "@/lib/progress/demoData";
+import { orderReviewQueue } from "@/lib/progress/reviewQueue";
+import { buildAttemptedConceptViews, buildConceptViews } from "@/lib/progress/views";
+import { selectWeakConcepts } from "@/lib/progress/weakConcepts";
+import type { ProgressRecord } from "@/lib/progress/types";
+import { Chip } from "@oocc/ui";
+import { useEffect, useState } from "react";
+import { ConceptGraph } from "./ConceptGraph";
+import { ReviewQueue } from "./ReviewQueue";
+import { RunHistory } from "./RunHistory";
+import { WeakConcepts } from "./WeakConcepts";
+
+interface LoadedState {
+  progress: ProgressRecord[] | null;
+  reviewQueue: ProgressRecord[] | null;
+}
+
+/**
+ * `/progress` — brief items 1-4 assembled: concept graph, review queue,
+ * run history, weak concepts. Attempts the real, session-gated
+ * `GET /api/progress` + `GET /api/progress/review-queue` first
+ * (`lib/progress/api.ts`); degrades to clearly-labeled demo data on a 401
+ * or network failure, since there's no login UI in this frontend yet (see
+ * that file's docstring). `progress === null` (not `[]`) is what "degrade"
+ * actually means here — a real, signed-in, zero-rows response renders as a
+ * genuinely empty (not demo) dashboard.
+ */
+export function ProgressDashboard() {
+  const [state, setState] = useState<LoadedState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([fetchProgress(), fetchReviewQueue()]).then(([progress, reviewQueue]) => {
+      if (!cancelled) setState({ progress, reviewQueue });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const now = new Date();
+  const isDemo = state === null || state.progress === null;
+
+  const progressRecords = state?.progress ?? buildDemoProgressRecords(now);
+  const conceptViews = buildConceptViews(progressRecords);
+  const attemptedViews = buildAttemptedConceptViews(progressRecords);
+  const weakConcepts = selectWeakConcepts(attemptedViews);
+
+  // The review-queue endpoint already returns the correctly-sorted set
+  // when it's live; the demo fallback (and the "queue not yet loaded"
+  // window) computes the identical ordering client-side (reviewQueue.ts)
+  // over the same attempted concepts.
+  const reviewRecords = state?.reviewQueue;
+  const reviewQueueViews =
+    reviewRecords !== undefined && reviewRecords !== null
+      ? orderReviewQueue(buildConceptViews(reviewRecords), now)
+      : orderReviewQueue(attemptedViews, now);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
+      <div className="flex shrink-0 items-center gap-3">
+        <h1 className="font-display text-[15px] font-semibold tracking-[-0.02em] text-ink">Progress</h1>
+        {isDemo ? (
+          <Chip tone="warn">Demo data — sign in to track your own progress</Chip>
+        ) : (
+          <Chip tone="ok">Live — your progress</Chip>
+        )}
+      </div>
+
+      <ConceptGraph views={conceptViews} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <ReviewQueue queue={reviewQueueViews} now={now} />
+        <WeakConcepts concepts={weakConcepts} />
+      </div>
+
+      <RunHistory />
+    </div>
+  );
+}

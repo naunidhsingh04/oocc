@@ -14,7 +14,11 @@ const eslintConfig = [
   // header says not to hand-edit it); its triple-slash reference is how
   // Next wires up generated route types and trips
   // @typescript-eslint/triple-slash-reference if linted.
-  { ignores: [".next/**", "node_modules/**", "next-env.d.ts"] },
+  // public/compiler/*.js is generated Emscripten glue for the compiler
+  // explorer WASM build (`compiler-explorer`'s emcmake output, copied in
+  // wholesale) — never hand-edited, so it's exempt the same way
+  // next-env.d.ts is.
+  { ignores: [".next/**", "node_modules/**", "next-env.d.ts", "public/compiler/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     plugins: { oocc: ooccPlugin },

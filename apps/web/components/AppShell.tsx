@@ -3,11 +3,13 @@
 import { CommandPalette, ToastProvider, ToastViewport, TooltipProvider } from "@oocc/ui";
 import { useEffect, useState, type ReactNode } from "react";
 import { useCommandRegistry } from "../lib/commands";
+import { useRunHistoryTracker } from "../lib/progress/useRunHistoryTracker";
 import { TopBar } from "./TopBar";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const commandRegistry = useCommandRegistry();
+  useRunHistoryTracker();
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

@@ -49,12 +49,16 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   const [panels, setPanels] = useState<PlanPanelNode[]>(() => loadStored(storageKey)?.panels ?? seedPlan.panels);
   const [maximizedId, setMaximizedId] = useState<string | null>(null);
 
+  // Re-seed whenever the underlying run changes, not on every plan object
+  // identity change (a fixture reload creates a new plan object each time).
+  // A `key`-prop remount would be the react-compiler-preferred shape for
+  // this, but this hook is shared across pages that don't all want a full
+  // subtree remount on every run switch.
   useEffect(() => {
     const stored = loadStored(storageKey);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPanels(stored?.panels ?? seedPlan.panels);
     setMaximizedId(null);
-    // Re-seed whenever the underlying run changes, not on every plan object
-    // identity change (a fixture reload creates a new plan object each time).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 

@@ -21,6 +21,12 @@ interface PanelFrameProps {
  * min-h-0 flex-col`, passing 100% of its box straight to the panel.
  */
 export function PanelFrame({ panel, availableTypes, maximized, onRemove, onRetype, onToggleMaximize }: PanelFrameProps) {
+  // resolvePanelComponent is a lookup into the static PANEL_REGISTRY map
+  // (panelRegistry.ts) — it never fabricates a new component, just returns
+  // one of a fixed set of stable references, so this isn't the "component
+  // defined during render" case react-compiler's static-components rule
+  // guards against; it just can't prove that through a dynamic lookup
+  // (flagged at the JSX usage below, not here).
   const Component = resolvePanelComponent(panel.type);
 
   return (
@@ -47,6 +53,7 @@ export function PanelFrame({ panel, availableTypes, maximized, onRemove, onRetyp
           <CloseIcon />
         </IconButton>
       </div>
+      {/* eslint-disable-next-line react-hooks/static-components -- see the resolvePanelComponent call above */}
       <Component panel={panel} />
     </div>
   );

@@ -3,7 +3,7 @@
 import type { ChannelAssignment } from "@/lib/player";
 import { Fragment } from "react";
 
-const BACKTICK_SPAN = /`([^`]+)`/g;
+const BACKTICK_SPAN_SOURCE = /`([^`]+)`/g;
 
 /**
  * Renders a tutor message's prose with every backtick-quoted identifier
@@ -21,8 +21,8 @@ export function MessageContent({ text, channels }: { text: string; channels: Cha
   let match: RegExpExecArray | null;
   let key = 0;
 
-  BACKTICK_SPAN.lastIndex = 0;
-  while ((match = BACKTICK_SPAN.exec(text)) !== null) {
+  const backtickSpan = new RegExp(BACKTICK_SPAN_SOURCE);
+  while ((match = backtickSpan.exec(text)) !== null) {
     if (match.index > lastIndex) {
       parts.push(<Fragment key={key++}>{text.slice(lastIndex, match.index)}</Fragment>);
     }

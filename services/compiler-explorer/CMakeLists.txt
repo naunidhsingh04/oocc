@@ -54,7 +54,11 @@ if(EMSCRIPTEN)
         "-lembind"
         "SHELL:-s MODULARIZE=1"
         "SHELL:-s EXPORT_NAME=OOCCCompiler"
-        "SHELL:-s ENVIRONMENT=node"
+        # `web,worker,node` (not just `node`): the round-trip CI check
+        # (tools/compare_native_wasm.mjs) loads this module under plain
+        # Node, but Phase 5 frontend loads the exact same artifact inside a
+        # browser Worker — one build serves both, rather than needing two.
+        "SHELL:-s ENVIRONMENT=web,worker,node"
         "SHELL:-s SINGLE_FILE=1"
         "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     )

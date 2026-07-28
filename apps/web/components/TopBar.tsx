@@ -10,6 +10,8 @@ const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/problems", label: "Problems" },
   { href: "/curriculum", label: "Curriculum" },
+  { href: "/progress", label: "Progress" },
+  { href: "/compiler", label: "Compiler" },
   { href: "/styleguide", label: "Styleguide" },
 ];
 

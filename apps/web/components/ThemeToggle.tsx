@@ -10,7 +10,11 @@ export function ThemeToggle() {
 
   // next-themes only knows the resolved theme after the client mounts;
   // rendering a neutral placeholder until then avoids a hydration mismatch.
+  // This mount-detection effect has no external system to synchronize with
+  // other than "has React committed the client render yet" — there's no
+  // subscription to move this into.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 
