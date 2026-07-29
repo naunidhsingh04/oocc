@@ -90,6 +90,12 @@ def compile_source(
         return CompileResult(
             ok=False, diagnostics=result.diagnostics, untraced_offer=untraced_offer
         )
+    # InstrumentResult isn't a discriminated union at the type level, but
+    # every `ok=True` construction site (instrument.py) always sets this —
+    # asserted, not just assumed, so a future call site that breaks the
+    # invariant fails loudly here instead of passing None into a subprocess
+    # command line several frames downstream.
+    assert result.instrumented_source is not None
 
     # A unique-per-call temp path, not a hash-derived deterministic one:
     # two concurrent requests for the *same* source would otherwise both

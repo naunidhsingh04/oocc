@@ -80,7 +80,7 @@ def compute_digest(trace: dict[str, Any]) -> Digest:
     )
 
 
-def _repr_of(value: dict | None) -> str:
+def _repr_of(value: dict[str, Any] | None) -> str:
     if value is None:
         return "None"
     if isinstance(value, dict) and "val" in value:
@@ -99,12 +99,12 @@ def _downsample(items: list[str], max_points: int) -> list[str]:
     return [items[int(i * stride)] for i in range(max_points)]
 
 
-def _loop_skeleton(steps: list[dict]) -> list[LoopSkeletonEntry]:
+def _loop_skeleton(steps: list[dict[str, Any]]) -> list[LoopSkeletonEntry]:
     """A "line" step whose line is lower than the previous "line" step
     *in the same frame activation* is a backward branch — the loop-detection
     rule apps/web/lib/player/loops.ts uses on the frontend, re-derived here
     from the trace alone (no shared code between the two languages)."""
-    frame_line_steps: dict[str, list[dict]] = {}
+    frame_line_steps: dict[str, list[dict[str, Any]]] = {}
     for step in steps:
         stack = step.get("stack") or []
         if not stack or step.get("event") != "line":
@@ -143,7 +143,7 @@ def _loop_skeleton(steps: list[dict]) -> list[LoopSkeletonEntry]:
     return entries[:MAX_LOOP_ENTRIES]
 
 
-def _variable_histories(steps: list[dict]) -> list[VariableHistory]:
+def _variable_histories(steps: list[dict[str, Any]]) -> list[VariableHistory]:
     """The active (innermost) frame's locals only, first-appearance order,
     capped at MAX_TRACKED_VARIABLES — the same channel-budget convention
     the frontend's lib/player/channels.ts uses, for the same reason: a
@@ -170,7 +170,7 @@ def _variable_histories(steps: list[dict]) -> list[VariableHistory]:
     ]
 
 
-def _call_graph(steps: list[dict]) -> list[CallGraphEdge]:
+def _call_graph(steps: list[dict[str, Any]]) -> list[CallGraphEdge]:
     edges: Counter[tuple[str, str]] = Counter()
     for step in steps:
         if step.get("event") != "call":
@@ -187,7 +187,7 @@ def _call_graph(steps: list[dict]) -> list[CallGraphEdge]:
     ]
 
 
-def _recursion_depth_histogram(steps: list[dict]) -> dict[int, int]:
+def _recursion_depth_histogram(steps: list[dict[str, Any]]) -> dict[int, int]:
     counts: Counter[int] = Counter(step.get("depth", 0) for step in steps)
     return dict(sorted(counts.items()))
 
@@ -233,12 +233,12 @@ def _heap_shape_signatures(trace: dict[str, Any]) -> list[str]:
     return signatures
 
 
-def _hot_lines(steps: list[dict]) -> list[tuple[int, int]]:
+def _hot_lines(steps: list[dict[str, Any]]) -> list[tuple[int, int]]:
     counts: Counter[int] = Counter(step["line"] for step in steps if "line" in step)
     return list(counts.most_common(MAX_HOT_LINES))
 
 
-def _stdout_tail(steps: list[dict]) -> str:
+def _stdout_tail(steps: list[dict[str, Any]]) -> str:
     full = "".join(step.get("stdout_delta", "") for step in steps)
     return full[-STDOUT_TAIL_CHARS:]
 

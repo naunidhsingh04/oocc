@@ -136,8 +136,16 @@ async def run_pipeline(
         "executor": executor,
         "llm_client": llm_client,
     }
-    result = await _COMPILED_GRAPH.ainvoke(initial_state)
-    return result  # type: ignore[return-value]
+    # LangGraph's compiled graph is generically typed, so `.ainvoke()`
+    # returns `Any` regardless of the TypedDict passed in — an explicit
+    # annotation on this assignment (not a `type: ignore`) is what
+    # narrows it back to `PipelineState`. The previous `type:
+    # ignore[return-value]` here targeted the wrong error code (the
+    # real complaint is no-any-return) and silently suppressed nothing;
+    # caught only once this module was actually checked under this
+    # package's own `strict = true` config, not mypy's defaults.
+    result: PipelineState = await _COMPILED_GRAPH.ainvoke(initial_state)
+    return result
 
 
 _DETERMINISTIC_CACHE_FIELDS = ("trace", "structures", "insights", "complexity", "plan")

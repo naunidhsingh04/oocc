@@ -124,7 +124,9 @@ def _apply_one(root: Any, tokens: list[str], op: dict[str, Any]) -> None:
             del container[last]
 
 
-def encode_keyframed(trace: dict[str, Any], *, interval: int = DEFAULT_KEYFRAME_INTERVAL) -> dict[str, Any]:
+def encode_keyframed(
+    trace: dict[str, Any], *, interval: int = DEFAULT_KEYFRAME_INTERVAL
+) -> dict[str, Any]:
     """Returns a new trace dict whose `steps` use the keyframe+patch scheme.
     Never mutates `trace`. Idempotent-adjacent: re-encoding an
     already-encoded trace first reconstructs each step's full heap (from
@@ -161,14 +163,18 @@ def decode_step_heap(steps: list[dict[str, Any]], i: int) -> dict[str, Any]:
     while "heap" not in steps[keyframe_pos]:
         keyframe_pos -= 1
 
-    heap = steps[keyframe_pos]["heap"]
+    heap: dict[str, Any] = steps[keyframe_pos]["heap"]
     for pos in range(keyframe_pos + 1, i + 1):
         heap = _reconstruct_step_heap(steps[pos], heap)
     return heap
 
 
-def _reconstruct_step_heap(step: dict[str, Any], prev_heap: dict[str, Any] | None) -> dict[str, Any]:
+def _reconstruct_step_heap(
+    step: dict[str, Any], prev_heap: dict[str, Any] | None
+) -> dict[str, Any]:
     if "heap" in step:
-        return step["heap"]
+        heap: dict[str, Any] = step["heap"]
+        return heap
     assert prev_heap is not None, "a step with heap_patch must follow a step with a known heap"
-    return apply_json_patch(prev_heap, step.get("heap_patch", []))
+    patched: dict[str, Any] = apply_json_patch(prev_heap, step.get("heap_patch", []))
+    return patched

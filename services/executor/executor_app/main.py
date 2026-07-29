@@ -10,6 +10,8 @@ same boundary and remain unbuilt — nothing here should be mistaken for that.
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import FastAPI
 from oocc_contracts import validate_trace
 from pydantic import BaseModel
@@ -36,7 +38,7 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/execute")
-async def execute(request: ExecuteRequest) -> dict:
+async def execute(request: ExecuteRequest) -> dict[str, Any]:
     """Full trace, schema-validated before it ever leaves the executor."""
     trace = Tracer().run(request.source, stdin=request.stdin)
     validate_trace(trace)  # raises -> 500 rather than shipping a malformed trace

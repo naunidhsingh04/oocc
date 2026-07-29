@@ -33,9 +33,9 @@ CONFIDENCE = {
 }
 
 
-def detect_structures(trace: dict[str, Any]) -> list[dict]:
+def detect_structures(trace: dict[str, Any]) -> list[dict[str, Any]]:
     merged_heap = merge_heap_across_steps(trace)
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     consumed: set[str] = set()  # oids already accounted for by another structure
 
     findings += _detect_linked_structures(merged_heap, consumed)
@@ -48,8 +48,10 @@ def detect_structures(trace: dict[str, Any]) -> list[dict]:
 # -- instance graphs: linked_list / binary_tree --------------------------------
 
 
-def _detect_linked_structures(merged_heap: dict[str, dict], consumed: set[str]) -> list[dict]:
-    findings: list[dict] = []
+def _detect_linked_structures(
+    merged_heap: dict[str, dict[str, Any]], consumed: set[str]
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
     by_type = _group_instances_by_type(merged_heap)
 
     for oids in by_type.values():
@@ -69,7 +71,7 @@ def _detect_linked_structures(merged_heap: dict[str, dict], consumed: set[str]) 
     return findings
 
 
-def _group_instances_by_type(merged_heap: dict[str, dict]) -> dict[str, list[str]]:
+def _group_instances_by_type(merged_heap: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
     for oid, obj in merged_heap.items():
         obj_type = obj.get("type")
@@ -79,7 +81,7 @@ def _group_instances_by_type(merged_heap: dict[str, dict]) -> dict[str, list[str
     return groups
 
 
-def _pointer_fields(oids: list[str], merged_heap: dict[str, dict]) -> list[str]:
+def _pointer_fields(oids: list[str], merged_heap: dict[str, dict[str, Any]]) -> list[str]:
     """Field names that, on every instance where present, hold either None
     or a reference to another instance of the same type group."""
     oid_set = set(oids)
@@ -108,7 +110,7 @@ def _pointer_fields(oids: list[str], merged_heap: dict[str, dict]) -> list[str]:
 
 
 def _build_pointer_graph(
-    oids: list[str], merged_heap: dict[str, dict], fields: list[str]
+    oids: list[str], merged_heap: dict[str, dict[str, Any]], fields: list[str]
 ) -> dict[str, dict[str, str | None]]:
     graph: dict[str, dict[str, str | None]] = {}
     for oid in oids:
@@ -150,7 +152,7 @@ def _connected_components(
 
 def _classify_component(
     component: set[str], graph: dict[str, dict[str, str | None]], fields: list[str]
-) -> dict | None:
+) -> dict[str, Any] | None:
     in_degree: dict[str, int] = {oid: 0 for oid in component}
     for oid in component:
         for target in graph[oid].values():
@@ -224,8 +226,10 @@ def _oid_number(oid: str) -> int:
 # -- dict-backed structures: graph / hash_map -----------------------------------
 
 
-def _detect_dict_structures(merged_heap: dict[str, dict], consumed: set[str]) -> list[dict]:
-    findings: list[dict] = []
+def _detect_dict_structures(
+    merged_heap: dict[str, dict[str, Any]], consumed: set[str]
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
     for oid, obj in merged_heap.items():
         if oid in consumed or obj.get("type") != "dict":
             continue
@@ -246,7 +250,9 @@ def _detect_dict_structures(merged_heap: dict[str, dict], consumed: set[str]) ->
     return findings
 
 
-def _looks_like_adjacency(entries: list[dict], merged_heap: dict[str, dict]) -> bool:
+def _looks_like_adjacency(
+    entries: list[dict[str, Any]], merged_heap: dict[str, dict[str, Any]]
+) -> bool:
     """An adjacency dict is a graph (PRD §4.3): every value is a reference
     to a list or set (the neighbor collection), not a scalar."""
     container_values = 0
@@ -261,8 +267,8 @@ def _looks_like_adjacency(entries: list[dict], merged_heap: dict[str, dict]) -> 
 
 
 def _detect_list_structures(
-    trace: dict[str, Any], merged_heap: dict[str, dict], consumed: set[str]
-) -> list[dict]:
+    trace: dict[str, Any], merged_heap: dict[str, dict[str, Any]], consumed: set[str]
+) -> list[dict[str, Any]]:
     # Two passes: first identify every array_2d (and consume its row refs),
     # since dict-merge insertion order can put a row's oid before its
     # parent's — a single pass could classify a row as its own "array"
@@ -280,7 +286,7 @@ def _detect_list_structures(
             array_2d_oids.add(oid)
             consumed.update(ref for ref in item_refs if ref is not None)
 
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     for oid in array_2d_oids:
         findings.append({"kind": "array_2d", "root_ref": oid, "confidence": CONFIDENCE["array_2d"]})
         consumed.add(oid)

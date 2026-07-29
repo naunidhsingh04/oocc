@@ -107,7 +107,9 @@ async def enforce_tutor_rate_limit(
     limiter: RateLimiter = Depends(get_rate_limiter),
 ) -> None:
     ip = http_request.client.host if http_request.client else "unknown"
-    ip_result = await limiter.check(f"tutor:ip:{ip}", limit=TUTOR_PER_IP_PER_MINUTE, window_seconds=60)
+    ip_result = await limiter.check(
+        f"tutor:ip:{ip}", limit=TUTOR_PER_IP_PER_MINUTE, window_seconds=60
+    )
     if not ip_result.allowed:
         raise HTTPException(
             status_code=429,

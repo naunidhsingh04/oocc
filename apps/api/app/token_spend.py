@@ -48,7 +48,8 @@ class RedisTokenSpendStore:
     async def record(self, user_id: str, tokens: int, *, day: str | None = None) -> None:
         key = _day_key(user_id, day or today_str())
         await self._client.incrby(key, tokens)
-        await self._client.expire(key, 90 * 24 * 60 * 60)  # 90 days, an ops window not a retention policy
+        # 90 days, an ops window not a retention policy
+        await self._client.expire(key, 90 * 24 * 60 * 60)
 
     async def get_range(self, user_id: str, *, days: int) -> list[DailySpend]:
         now = datetime.now(UTC)

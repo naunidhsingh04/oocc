@@ -78,7 +78,8 @@ class GeminiClient:
         )
         if response.usage_metadata is not None:
             self.last_usage_tokens = response.usage_metadata.total_token_count
-        return json.loads(response.text or "{}")
+        parsed: dict[str, Any] = json.loads(response.text or "{}")
+        return parsed
 
     async def stream_text(
         self, *, system: str, prompt: str, thinking_budget: int = 1024

@@ -65,7 +65,7 @@ def compile_to_wasm(
     out_wasm: Path,
     *,
     extra_args: list[str] | None = None,
-) -> subprocess.CompletedProcess:
+) -> subprocess.CompletedProcess[str]:
     """Compiles already-instrumented C++ source to a wasm32-wasi module.
     `extra_args` is where callers pass memory-limit linker flags for the
     out-of-bounds-write fixture (see fixtures/cpp/programs/out_of_bounds_write.cpp)."""

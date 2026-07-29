@@ -24,7 +24,8 @@ from executor_app.tracer import Tracer
 
 def test_infinite_loop_is_stopped_by_wall_clock_not_left_to_run_forever() -> None:
     start = time.monotonic()
-    trace = Tracer(wall_clock_limit_s=0.5, keep_head=1000, keep_tail=0).run("i = 0\nwhile True:\n    i += 1\n")
+    tracer = Tracer(wall_clock_limit_s=0.5, keep_head=1000, keep_tail=0)
+    trace = tracer.run("i = 0\nwhile True:\n    i += 1\n")
     elapsed = time.monotonic() - start
 
     assert trace["status"] == "step_limit"
@@ -61,9 +62,8 @@ def test_unicode_bomb_stdout_is_truncated_not_unbounded() -> None:
     # the stdout-cap fixture-generator tests) — proves the 256KB cap holds
     # even for one enormous single `print`, which a naive per-call-size
     # check could miss if it only looked at cumulative *count* of writes.
-    trace = Tracer(stdout_limit_bytes=256_000, keep_head=100, keep_tail=0, wall_clock_limit_s=5.0).run(
-        "print('\\u2603' * 5_000_000)\n"
-    )
+    tracer = Tracer(stdout_limit_bytes=256_000, keep_head=100, keep_tail=0, wall_clock_limit_s=5.0)
+    trace = tracer.run("print('\\u2603' * 5_000_000)\n")
 
     total_stdout = sum(len(s.get("stdout_delta", "").encode("utf-8")) for s in trace["steps"])
     assert total_stdout < 300_000  # cap plus one marker step, not 5,000,000 snowman bytes

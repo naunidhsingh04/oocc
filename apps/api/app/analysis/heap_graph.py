@@ -11,7 +11,7 @@ from typing import Any
 BUILTIN_HEAP_TYPES = {"list", "tuple", "dict", "set", "str", "function", "opaque"}
 
 
-def merge_heap_across_steps(trace: dict[str, Any]) -> dict[str, dict]:
+def merge_heap_across_steps(trace: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """The fullest known snapshot of every heap object that ever appeared.
 
     A given heap id's *shape* (its type and field/key names) never changes
@@ -19,13 +19,13 @@ def merge_heap_across_steps(trace: dict[str, Any]) -> dict[str, dict]:
     each id is enough to classify structure, without needing to pick "the"
     step to look at.
     """
-    merged: dict[str, dict] = {}
+    merged: dict[str, dict[str, Any]] = {}
     for step in trace.get("steps", []):
         merged.update(step.get("heap", {}))
     return merged
 
 
-def value_ref(value: dict | None) -> str | None:
+def value_ref(value: dict[str, Any] | None) -> str | None:
     """The heap id a Value points at, or None if it's not a reference."""
     if isinstance(value, dict) and "ref" in value:
         ref = value["ref"]
@@ -33,19 +33,21 @@ def value_ref(value: dict | None) -> str | None:
     return None
 
 
-def is_none_value(value: dict | None) -> bool:
+def is_none_value(value: dict[str, Any] | None) -> bool:
     if value is None:
         return True
     return isinstance(value, dict) and "val" in value and value["val"] is None
 
 
-def heap_object_length_history(trace: dict[str, Any], oid: str) -> list[tuple[int, list]]:
+def heap_object_length_history(
+    trace: dict[str, Any], oid: str
+) -> list[tuple[int, list[Any]]]:
     """Every (step_i, items) observation of a list/tuple/set heap object,
     in step order, wherever it appears in that step's heap. Used for
     access-pattern classification (stack/queue) in structure_detector and
     the mutation-during-iteration detector in insight_scanner.
     """
-    history: list[tuple[int, list]] = []
+    history: list[tuple[int, list[Any]]] = []
     for step in trace.get("steps", []):
         obj = step.get("heap", {}).get(oid)
         if obj is not None and obj.get("type") in ("list", "tuple", "set"):
@@ -53,7 +55,7 @@ def heap_object_length_history(trace: dict[str, Any], oid: str) -> list[tuple[in
     return history
 
 
-def item_key(value: dict | None) -> str:
+def item_key(value: dict[str, Any] | None) -> str:
     """A hashable, order-and-value-sensitive key for one Value, good enough
     to detect "did this element change" without deep equality machinery.
     Heap-referenced elements are compared by id, which is exactly right:

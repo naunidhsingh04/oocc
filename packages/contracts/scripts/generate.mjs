@@ -16,6 +16,32 @@ const here = dirname(fileURLToPath(import.meta.url));
 const contractsDir = resolve(here, "..");
 const repoRoot = resolve(contractsDir, "../..");
 
+// `uv`'s official installer puts a real binary on PATH, but `pip install uv`
+// (this sandbox's own install method — see CLAUDE.md) only creates a
+// console-script entry point under the interpreter's own user-scripts
+// directory, which isn't on PATH by default. Resolving lazily at the call
+// site rather than assuming a bare `uv` always resolves is what makes this
+// script (and therefore `pnpm gen:contracts:check`, the CI staleness gate)
+// actually run on a machine set up either way, not just the one this was
+// first written on.
+function resolveUvCommand() {
+  try {
+    execFileSync("uv", ["--version"], { stdio: "ignore" });
+    return { command: "uv", prefixArgs: [] };
+  } catch {
+    // Fall through to `python3 -m uv`.
+  }
+  try {
+    execFileSync("python3", ["-m", "uv", "--version"], { stdio: "ignore" });
+    return { command: "python3", prefixArgs: ["-m", "uv"] };
+  } catch {
+    throw new Error(
+      "Neither `uv` nor `python3 -m uv` is runnable — install uv (https://astral.sh/uv) " +
+        "or `pip install uv` before running gen:contracts.",
+    );
+  }
+}
+
 const SCHEMAS = [
   {
     name: "trace",
@@ -112,14 +138,16 @@ function freezeRootModels(source, names) {
 async function generatePython() {
   const outDir = resolve(contractsDir, "python/src/oocc_contracts/generated");
   await mkdir(outDir, { recursive: true });
+  const uv = resolveUvCommand();
 
   for (const { schemaFile, pyModule, frozenRootModels } of SCHEMAS) {
     const schemaPath = resolve(contractsDir, schemaFile);
     const outPath = resolve(outDir, `${pyModule}.py`);
 
     execFileSync(
-      "uv",
+      uv.command,
       [
+        ...uv.prefixArgs,
         "run",
         "--package",
         "oocc-contracts",

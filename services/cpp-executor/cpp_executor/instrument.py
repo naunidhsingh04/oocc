@@ -24,7 +24,9 @@ from __future__ import annotations
 
 import hashlib
 import itertools
+import multiprocessing
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -125,7 +127,10 @@ class LineIndex:
                 self._starts.append(i + 1)
 
     def offset(self, loc: ci.SourceLocation) -> int:
-        return self._starts[loc.line - 1] + (loc.column - 1)
+        # loc.line/loc.column come back as `Any` from libclang's untyped
+        # bindings (see the clang.* mypy override above) — int(...) is a
+        # real runtime-checked narrowing, not just a type-checker hint.
+        return self._starts[int(loc.line) - 1] + (int(loc.column) - 1)
 
 
 def _find_semicolon_end(source: str, from_offset: int) -> int:
@@ -138,7 +143,7 @@ def _in_user_file(cursor: ci.Cursor, filename: str) -> bool:
     return loc_file is not None and loc_file.name == filename
 
 
-def _gather_compound_stmts(cursor: ci.Cursor, filename: str):
+def _gather_compound_stmts(cursor: ci.Cursor, filename: str) -> Iterator[ci.Cursor]:
     if cursor.kind == ci.CursorKind.COMPOUND_STMT and _in_user_file(cursor, filename):
         yield cursor
     for child in cursor.get_children():
@@ -163,7 +168,7 @@ def _find_unsupported(cursor: ci.Cursor, filename: str, out: list[Diagnostic]) -
         _find_unsupported(child, filename, out)
 
 
-def _top_level_function_defs(tu_cursor: ci.Cursor, filename: str):
+def _top_level_function_defs(tu_cursor: ci.Cursor, filename: str) -> Iterator[ci.Cursor]:
     for cursor in tu_cursor.get_children():
         if not _in_user_file(cursor, filename):
             continue
@@ -178,7 +183,7 @@ def _top_level_function_defs(tu_cursor: ci.Cursor, filename: str):
                     yield member
 
 
-def _top_level_record_defs(tu_cursor: ci.Cursor, filename: str):
+def _top_level_record_defs(tu_cursor: ci.Cursor, filename: str) -> Iterator[ci.Cursor]:
     for cursor in tu_cursor.get_children():
         if not _in_user_file(cursor, filename):
             continue
@@ -189,7 +194,7 @@ def _top_level_record_defs(tu_cursor: ci.Cursor, filename: str):
             yield cursor
 
 
-def _record_fields(record_cursor: ci.Cursor):
+def _record_fields(record_cursor: ci.Cursor) -> list[ci.Cursor]:
     return [c for c in record_cursor.get_children() if c.kind == ci.CursorKind.FIELD_DECL]
 
 
@@ -312,7 +317,7 @@ def _rewrite_raw_allocator_calls(source: str) -> str:
     source.
     """
 
-    def repl(m: re.Match) -> str:
+    def repl(m: re.Match[str]) -> str:
         return RAW_ALLOCATOR_NAMES[m.group(1)] + "("
 
     pattern = r"\b(" + "|".join(RAW_ALLOCATOR_NAMES) + r")\s*\("
@@ -493,7 +498,7 @@ def _instrument_worker(
     source: str,
     run_id: str,
     extra_clang_args: list[str] | None,
-    result_queue: "multiprocessing.Queue[InstrumentResult]",
+    result_queue: multiprocessing.Queue[InstrumentResult],
 ) -> None:
     result_queue.put(instrument(source, run_id=run_id, extra_clang_args=extra_clang_args))
 
@@ -529,10 +534,8 @@ def instrument_isolated(
     anyway — using the same context on every platform means one code path,
     not "works on Linux, silently different on Windows."
     """
-    import multiprocessing
-
     ctx = multiprocessing.get_context("spawn")
-    result_queue: "multiprocessing.Queue[InstrumentResult]" = ctx.Queue()
+    result_queue: multiprocessing.Queue[InstrumentResult] = ctx.Queue()
     process = ctx.Process(
         target=_instrument_worker, args=(source, run_id, extra_clang_args, result_queue)
     )
@@ -545,7 +548,10 @@ def instrument_isolated(
         return InstrumentResult(
             ok=False,
             diagnostics=[
-                Diagnostic(kind="resource_limit", message=f"Parsing timed out after {timeout_s:.0f}s.")
+                Diagnostic(
+                    kind="resource_limit",
+                    message=f"Parsing timed out after {timeout_s:.0f}s.",
+                )
             ],
         )
 

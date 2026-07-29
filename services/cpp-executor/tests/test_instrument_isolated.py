@@ -33,7 +33,10 @@ def test_normal_source_parses_successfully() -> None:
 
 
 def test_unsupported_construct_still_reported_normally() -> None:
-    source = "template<typename T> T identity(T x) { return x; }\nint main() { return identity(1); }\n"
+    source = (
+        "template<typename T> T identity(T x) { return x; }\n"
+        "int main() { return identity(1); }\n"
+    )
     result = instrument_isolated(source, run_id="r_test0000000000")
     assert not result.ok
     assert result.diagnostics[0].kind == "unsupported_construct"

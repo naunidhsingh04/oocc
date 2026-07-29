@@ -66,8 +66,8 @@ class _TraceState:
     # its oldest entry in O(1) as new ones arrive. This keeps "first
     # keep_head + last keep_tail" without ever doing an O(n) mid-list
     # delete, which matters at the real 100k-step scale (§3.3).
-    head_steps: list[dict] = field(default_factory=list)
-    tail_buffer: deque[dict] = field(default_factory=lambda: deque(maxlen=0))
+    head_steps: list[dict[str, Any]] = field(default_factory=list)
+    tail_buffer: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=0))
     executed_step_count: int = 0
     frame_stack: list[_Frame] = field(default_factory=list)
     next_frame_id: int = 0
@@ -108,7 +108,7 @@ class Tracer:
 
     # -- public entrypoint ----------------------------------------------
 
-    def run(self, source: str, *, stdin: str = "") -> dict:
+    def run(self, source: str, *, stdin: str = "") -> dict[str, Any]:
         source_hash = "sha256:" + hashlib.sha256(source.encode()).hexdigest()
         code = compile(source, USER_CODE_FILENAME, "exec")
         run_globals: dict[str, Any] = {
@@ -134,7 +134,7 @@ class Tracer:
         sys.monitoring.register_callback(TOOL_ID, events.RAISE, self._on_raise)
 
         status = "ok"
-        error_obj: dict | None = None
+        error_obj: dict[str, Any] | None = None
         self._start_time = time.monotonic()
 
         stdout_capture = _CapturingWriter(self._on_stdout_write)
@@ -310,12 +310,12 @@ class Tracer:
         if self._state.executed_step_count >= self.step_limit:
             raise StepLimitReached
 
-    def _snapshot(self) -> tuple[list[dict], dict[str, dict], bool]:
+    def _snapshot(self) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool]:
         state = self._state
-        heap: dict[str, dict] = {}
+        heap: dict[str, dict[str, Any]] = {}
         heap_truncated = False
 
-        def visit(obj: Any) -> dict | None:
+        def visit(obj: Any) -> dict[str, Any] | None:
             nonlocal heap_truncated
             oid = state.obj_ids.get(id(obj))
             if oid is not None:
@@ -339,7 +339,7 @@ class Tracer:
             heap[oid] = self._encode_heap_object(obj, visit)
             return {"ref": oid}
 
-        def encode_value(obj: Any) -> dict | None:
+        def encode_value(obj: Any) -> dict[str, Any] | None:
             ref = visit(obj)
             if ref is not None:
                 return ref
@@ -373,7 +373,7 @@ class Tracer:
         # nodes) - `visit` recurses directly, so `heap` is complete here.
         return stack_json, heap, heap_truncated
 
-    def _encode_heap_object(self, obj: Any, visit: Any) -> dict:
+    def _encode_heap_object(self, obj: Any, visit: Any) -> dict[str, Any]:
         if isinstance(obj, str):
             return {"type": "str", "len": len(obj), "value": obj}
         if isinstance(obj, list):
@@ -436,13 +436,13 @@ class Tracer:
             return {"type": type(obj).__name__, "fields": fields}
         return {"type": "opaque", "repr": _safe_repr(obj)}
 
-    def _encode_or_ref(self, obj: Any, visit: Any) -> dict | None:
-        ref = visit(obj)
+    def _encode_or_ref(self, obj: Any, visit: Any) -> dict[str, Any] | None:
+        ref: dict[str, Any] | None = visit(obj)
         if ref is not None:
             return ref
         return self._encode_inline(obj)
 
-    def _encode_inline(self, obj: Any) -> dict | None:
+    def _encode_inline(self, obj: Any) -> dict[str, Any] | None:
         if obj is None:
             return {"val": None, "repr": "None"}
         if isinstance(obj, bool):
@@ -453,7 +453,7 @@ class Tracer:
             return {"val": obj}
         return {"val": _safe_repr(obj), "repr": _safe_repr(obj)}
 
-    def _to_value(self, obj: Any) -> dict | None:
+    def _to_value(self, obj: Any) -> dict[str, Any] | None:
         """Encode a standalone value (e.g. a return value) that isn't
         necessarily reachable from any frame's locals, adding it to the
         heap keepalive table if it's a heap type."""
@@ -468,7 +468,9 @@ class Tracer:
             return {"ref": oid}
         return self._encode_inline(obj)
 
-    def _flatten_paths(self, stack_json: list[dict], heap_json: dict[str, dict]) -> dict[str, str]:
+    def _flatten_paths(
+        self, stack_json: list[dict[str, Any]], heap_json: dict[str, dict[str, Any]]
+    ) -> dict[str, str]:
         paths: dict[str, str] = {}
         for frame_json in stack_json:
             fid = frame_json["frame_id"]
@@ -490,7 +492,7 @@ class Tracer:
                     paths[f"{oid}.{name}"] = repr(value)
         return paths
 
-    def _build_error(self, exc: BaseException) -> dict:
+    def _build_error(self, exc: BaseException) -> dict[str, Any]:
         # extract_tb() includes this tracer's own `exec(code, run_globals)`
         # frame (it's genuinely part of the real call stack) — drop it so
         # `traceback` reads as the user's program, not our harness.
@@ -526,7 +528,7 @@ class CounterTracer:
         self._count = 0
         self._start_time = 0.0
 
-    def run(self, source: str, *, stdin: str = "") -> dict:
+    def run(self, source: str, *, stdin: str = "") -> dict[str, Any]:
         code = compile(source, USER_CODE_FILENAME, "exec")
         run_globals: dict[str, Any] = {
             "__name__": "__main__",
@@ -587,11 +589,12 @@ def _is_heap_type(obj: Any) -> bool:
     return True
 
 
-def _heap_key_repr_from_value(value: dict | None) -> str:
+def _heap_key_repr_from_value(value: dict[str, Any] | None) -> str:
     if value is None:
         return "None"
     if "ref" in value:
-        return value["ref"]
+        ref: str = value["ref"]
+        return ref
     return _heap_key_repr(value.get("val"))
 
 
@@ -607,7 +610,7 @@ class _CapturingWriter(io.TextIOBase):
         super().__init__()
         self._on_write = on_write
 
-    def write(self, s: str) -> int:  # type: ignore[override]
+    def write(self, s: str) -> int:
         self._on_write(s)
         return len(s)
 
@@ -615,9 +618,11 @@ class _CapturingWriter(io.TextIOBase):
         pass
 
 
-def run_source(source: str, *, stdin: str = "", **tracer_kwargs: Any) -> dict:
+def run_source(source: str, *, stdin: str = "", **tracer_kwargs: Any) -> dict[str, Any]:
     return Tracer(**tracer_kwargs).run(source, stdin=stdin)
 
 
-def run_source_counters_only(source: str, *, stdin: str = "", **tracer_kwargs: Any) -> dict:
+def run_source_counters_only(
+    source: str, *, stdin: str = "", **tracer_kwargs: Any
+) -> dict[str, Any]:
     return CounterTracer(**tracer_kwargs).run(source, stdin=stdin)

@@ -20,3 +20,15 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+# libclang's Python bindings (clang.cindex) ship no type stubs and no
+# py.typed marker, and no types-libclang package exists on PyPI to supply
+# them — this is a real, permanent gap in the library, not something to
+# work around by hand-writing full stubs for a third-party C API wrapper.
+[[tool.mypy.overrides]]
+module = ["clang", "clang.*"]
+ignore_missing_imports = true

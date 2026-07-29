@@ -57,7 +57,9 @@ def _report(label: str, trace: dict) -> None:
     encoded = encode_keyframed(trace)
 
     for i, step in enumerate(trace["steps"]):
-        assert decode_step_heap(encoded["steps"], i) == step["heap"], f"reconstruction mismatch at step {i}"
+        assert decode_step_heap(encoded["steps"], i) == step["heap"], (
+            f"reconstruction mismatch at step {i}"
+        )
 
     original_raw = json.dumps(trace).encode()
     encoded_raw = json.dumps(encoded).encode()
@@ -72,14 +74,19 @@ def _report(label: str, trace: dict) -> None:
 
     print(f"\n=== {label} ===")
     print(f"steps: {len(trace['steps']):,} ({keyframe_count:,} kept as keyframes)")
-    print(f"raw JSON:   {len(original_raw):>10,} -> {len(encoded_raw):>10,} bytes  ({pct(len(original_raw), len(encoded_raw))})")
-    print(f"gzip'd:     {len(original_gz):>10,} -> {len(encoded_gz):>10,} bytes  ({pct(len(original_gz), len(encoded_gz))})")
+    raw_pct = pct(len(original_raw), len(encoded_raw))
+    gz_pct = pct(len(original_gz), len(encoded_gz))
+    print(f"raw JSON:   {len(original_raw):>10,} -> {len(encoded_raw):>10,} bytes  ({raw_pct})")
+    print(f"gzip'd:     {len(original_gz):>10,} -> {len(encoded_gz):>10,} bytes  ({gz_pct})")
     print("reconstruction: every step verified byte-identical to the original")
 
 
 def main() -> None:
     fixture_path = REPO_ROOT / "fixtures" / "large_trace_40k.trace.json"
-    _report("fixtures/large_trace_40k.trace.json (PRD-named fixture; empty heap throughout)", json.loads(fixture_path.read_text()))
+    _report(
+        "fixtures/large_trace_40k.trace.json (PRD-named fixture; empty heap throughout)",
+        json.loads(fixture_path.read_text()),
+    )
 
     tracer = Tracer(step_limit=200_000, keep_head=200_000, keep_tail=0, wall_clock_limit_s=60)
     synthetic = tracer.run(BUBBLE_SORT_300_SOURCE)

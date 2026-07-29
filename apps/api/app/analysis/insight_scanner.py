@@ -26,8 +26,8 @@ BUILTIN_NAMES = frozenset(dir(builtins_module))
 RUNAWAY_LOOP_MIN_STEPS = 500
 
 
-def scan_insights(trace: dict[str, Any], source: str) -> list[dict]:
-    insights: list[dict] = []
+def scan_insights(trace: dict[str, Any], source: str) -> list[dict[str, Any]]:
+    insights: list[dict[str, Any]] = []
     insights += _detect_runaway_loop(trace)
     insights += _detect_off_by_one(trace)
     insights += _detect_mutation_during_iteration(trace, source)
@@ -41,7 +41,7 @@ def scan_insights(trace: dict[str, Any], source: str) -> list[dict]:
 # -- runaway / infinite loop -----------------------------------------------
 
 
-def _detect_runaway_loop(trace: dict[str, Any]) -> list[dict]:
+def _detect_runaway_loop(trace: dict[str, Any]) -> list[dict[str, Any]]:
     # Hitting the tracer's own step/wall-clock cap (see CounterTracer /
     # Tracer's step_limit) is itself the evidence: a loop that never
     # terminates within a generous budget IS a runaway loop, whether its
@@ -88,7 +88,7 @@ def _detect_runaway_loop(trace: dict[str, Any]) -> list[dict]:
 # -- off-by-one --------------------------------------------------------------
 
 
-def _detect_off_by_one(trace: dict[str, Any]) -> list[dict]:
+def _detect_off_by_one(trace: dict[str, Any]) -> list[dict[str, Any]]:
     error = trace.get("error")
     if not error or error.get("type") not in ("IndexError", "KeyError"):
         return []
@@ -108,7 +108,9 @@ def _detect_off_by_one(trace: dict[str, Any]) -> list[dict]:
 # -- mutation during iteration -----------------------------------------------
 
 
-def _detect_mutation_during_iteration(trace: dict[str, Any], source: str) -> list[dict]:
+def _detect_mutation_during_iteration(
+    trace: dict[str, Any], source: str
+) -> list[dict[str, Any]]:
     """Only `for x in container:` (direct iteration) is the risky pattern
     PRD §4.3 means — mutating the sequence you're walking element-by-element
     can skip or repeat items. `for i in range(len(container)): container[i]`
@@ -131,7 +133,7 @@ def _detect_mutation_during_iteration(trace: dict[str, Any], source: str) -> lis
     if not loops:
         return []
 
-    findings: list[dict] = []
+    findings: list[dict[str, Any]] = []
     reported: set[tuple[str, str]] = set()
 
     for step in trace.get("steps", []):
@@ -178,8 +180,8 @@ def _detect_mutation_during_iteration(trace: dict[str, Any], source: str) -> lis
 # -- accidental O(n^2) --------------------------------------------------------
 
 
-def _detect_accidental_quadratic(trace: dict[str, Any], source: str) -> list[dict]:
-    findings: list[dict] = []
+def _detect_accidental_quadratic(trace: dict[str, Any], source: str) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
 
     # Trace signal: a list grown via front-insertion (list.insert(0, x) or
     # equivalent) — same shape as structure_detector's queue-front-growth,
@@ -284,7 +286,9 @@ def _compares_against_a_set(node: ast.Compare, set_valued_names: set[str]) -> bo
     return isinstance(comparator, ast.Name) and comparator.id in set_valued_names
 
 
-def _static_quadratic_finding(trace: dict[str, Any], lineno: int, detail: str) -> dict | None:
+def _static_quadratic_finding(
+    trace: dict[str, Any], lineno: int, detail: str
+) -> dict[str, Any] | None:
     step_refs = [s["i"] for s in trace.get("steps", []) if s.get("line") == lineno]
     if not step_refs:
         return None
@@ -299,7 +303,7 @@ def _static_quadratic_finding(trace: dict[str, Any], lineno: int, detail: str) -
 # -- shadowed builtin ----------------------------------------------------------
 
 
-def _detect_shadowed_builtin(trace: dict[str, Any], source: str) -> list[dict]:
+def _detect_shadowed_builtin(trace: dict[str, Any], source: str) -> list[dict[str, Any]]:
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -343,7 +347,7 @@ def _detect_shadowed_builtin(trace: dict[str, Any], source: str) -> list[dict]:
 # -- dead variable -------------------------------------------------------------
 
 
-def _detect_dead_variable(trace: dict[str, Any], source: str) -> list[dict]:
+def _detect_dead_variable(trace: dict[str, Any], source: str) -> list[dict[str, Any]]:
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -390,7 +394,7 @@ def _detect_dead_variable(trace: dict[str, Any], source: str) -> list[dict]:
 # -- redundant recomputation ----------------------------------------------------
 
 
-def _detect_redundant_recomputation(trace: dict[str, Any]) -> list[dict]:
+def _detect_redundant_recomputation(trace: dict[str, Any]) -> list[dict[str, Any]]:
     signatures: dict[tuple[str, tuple[str, ...]], list[int]] = {}
     for step in trace.get("steps", []):
         if step.get("event") != "call" or not step.get("stack"):

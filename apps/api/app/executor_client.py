@@ -11,6 +11,7 @@ async route handlers without blocking the event loop on network I/O.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import httpx2 as httpx
 
@@ -31,19 +32,21 @@ class ExecutorClient:
             timeout=timeout_s,
         )
 
-    async def execute(self, source: str, *, stdin: str = "") -> dict:
+    async def execute(self, source: str, *, stdin: str = "") -> dict[str, Any]:
         """Full trace via POST /execute."""
         response = await self._client.post("/execute", json={"source": source, "stdin": stdin})
         response.raise_for_status()
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
-    async def execute_counters(self, source: str, *, stdin: str = "") -> dict:
+    async def execute_counters(self, source: str, *, stdin: str = "") -> dict[str, Any]:
         """Fast step-count-only result via POST /execute/counters."""
         response = await self._client.post(
             "/execute/counters", json={"source": source, "stdin": stdin}
         )
         response.raise_for_status()
-        return response.json()
+        result: dict[str, Any] = response.json()
+        return result
 
     async def aclose(self) -> None:
         await self._client.aclose()

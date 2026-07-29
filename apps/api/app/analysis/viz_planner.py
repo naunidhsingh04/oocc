@@ -52,7 +52,9 @@ def source_hash(source: str) -> str:
     return f"sha256:{hashlib.sha256(source.encode()).hexdigest()}"
 
 
-def plan_viz(source: str, structures: list[dict], trace: dict[str, Any]) -> dict[str, Any]:
+def plan_viz(
+    source: str, structures: list[dict[str, Any]], trace: dict[str, Any]
+) -> dict[str, Any]:
     key = source_hash(source)
     if key in _cache:
         _cache.move_to_end(key)
@@ -68,7 +70,7 @@ def plan_viz(source: str, structures: list[dict], trace: dict[str, Any]) -> dict
     return plan
 
 
-def _build_plan(structures: list[dict], trace: dict[str, Any]) -> dict[str, Any]:
+def _build_plan(structures: list[dict[str, Any]], trace: dict[str, Any]) -> dict[str, Any]:
     panels: list[dict[str, Any]] = []
     next_id = _id_counter()
 

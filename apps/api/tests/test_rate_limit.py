@@ -50,7 +50,7 @@ async def test_remaining_counts_down() -> None:
 
 
 class _AlwaysBlockingLimiter:
-    async def check(self, key: str, *, limit: int, window_seconds: int) -> "object":
+    async def check(self, key: str, *, limit: int, window_seconds: int) -> object:
         from app.rate_limit import RateLimitResult
 
         return RateLimitResult(allowed=False, remaining=0, retry_after_seconds=30)

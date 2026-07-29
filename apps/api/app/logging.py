@@ -41,7 +41,12 @@ def scrub_secrets(text: str) -> str:
     structlog pipeline — e.g. an exception handler formatting a traceback
     for a response or an external error report. Uses the same
     request-scoped secret set `bind_sensitive_value` populates."""
-    return _scrub(text)
+    # `_scrub` is deliberately `Any -> Any` (it recurses over dict/list/str
+    # values from a structlog event dict) — its own `isinstance(value, str)`
+    # branch guarantees a `str` input always returns a `str`, so this
+    # narrows the type back rather than widening what `_scrub` accepts.
+    scrubbed: str = _scrub(text)
+    return scrubbed
 
 
 def _scrub(value: Any) -> Any:

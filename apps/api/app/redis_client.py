@@ -30,7 +30,7 @@ class _LazyRedisCache:
     async def _client(self) -> Any:
         global _redis_client
         if _redis_client is None:
-            import redis.asyncio as redis  # type: ignore[import-untyped]
+            import redis.asyncio as redis
 
             _redis_client = redis.from_url(os.environ.get("REDIS_URL", DEFAULT_REDIS_URL))
         return _redis_client
@@ -70,7 +70,7 @@ class _LazyRedisRateLimiter:
     async def _client(self) -> Any:
         global _redis_client
         if _redis_client is None:
-            import redis.asyncio as redis  # type: ignore[import-untyped]
+            import redis.asyncio as redis
 
             _redis_client = redis.from_url(os.environ.get("REDIS_URL", DEFAULT_REDIS_URL))
         return _redis_client
@@ -101,7 +101,7 @@ class _LazyRedisTokenSpendStore:
     async def _client(self) -> Any:
         global _redis_client
         if _redis_client is None:
-            import redis.asyncio as redis  # type: ignore[import-untyped]
+            import redis.asyncio as redis
 
             _redis_client = redis.from_url(os.environ.get("REDIS_URL", DEFAULT_REDIS_URL))
         return _redis_client
@@ -119,8 +119,9 @@ class _LazyRedisTokenSpendStore:
             return await store.get_range(user_id, days=days)
         except Exception as exc:  # noqa: BLE001 — see class docstring
             logger.warning("token_spend.get_range_failed", error=str(exc))
-            from app.token_spend import today_str
             from datetime import UTC, datetime, timedelta
+
+            from app.token_spend import today_str
 
             now = datetime.now(UTC)
             return [

@@ -17,6 +17,8 @@ when we don't.
 
 from __future__ import annotations
 
+from typing import Any
+
 from app.analysis.ast_inspect import (
     build_harness_source,
     find_primary_function,
@@ -29,7 +31,7 @@ SIZES = [10, 50, 100, 500, 1000]
 SHAPES = ["random", "sorted", "reverse", "all_equal"]
 
 
-async def analyze_complexity(source: str, executor: ExecutorClient) -> dict | None:
+async def analyze_complexity(source: str, executor: ExecutorClient) -> dict[str, Any] | None:
     fn = find_primary_function(source)
     if fn is None:
         return None
@@ -38,7 +40,7 @@ async def analyze_complexity(source: str, executor: ExecutorClient) -> dict | No
         return None
 
     shapes = SHAPES if size_param.kind == "list_int" else SHAPES[:1]
-    samples: list[dict] = []
+    samples: list[dict[str, Any]] = []
     worst_at_n: dict[int, int] = {}
 
     for shape in shapes:

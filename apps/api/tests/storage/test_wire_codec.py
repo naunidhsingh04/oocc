@@ -107,7 +107,13 @@ class TestEncodeKeyframed:
             {"o1": {"type": "list", "len": 3, "items": [{"val": 1}, {"val": 2}, {"val": 3}]}},
             {"o1": {"type": "list", "len": 3, "items": [{"val": 1}, {"val": 9}, {"val": 3}]}},
             {"o1": {"type": "list", "len": 3, "items": [{"val": 1}, {"val": 9}, {"val": 7}]}},
-            {"o1": {"type": "list", "len": 4, "items": [{"val": 1}, {"val": 9}, {"val": 7}, {"val": 0}]}},
+            {
+                "o1": {
+                    "type": "list",
+                    "len": 4,
+                    "items": [{"val": 1}, {"val": 9}, {"val": 7}, {"val": 0}],
+                }
+            },
         ]
         original_steps = [_step(i, h) for i, h in enumerate(heaps)]
         trace = {"steps": original_steps}
@@ -166,7 +172,10 @@ class TestRepresentativeHeapHeavyTraceSavings:
         encoded_bytes = gzip.compress(json.dumps(encoded).encode())
         reduction = 1 - (len(encoded_bytes) / len(original_bytes))
 
-        print(f"\nsynthetic heap-heavy trace: {len(original_bytes):,} -> {len(encoded_bytes):,} gzip bytes ({reduction:.1%} reduction)")
+        print(
+            f"\nsynthetic heap-heavy trace: {len(original_bytes):,} -> "
+            f"{len(encoded_bytes):,} gzip bytes ({reduction:.1%} reduction)"
+        )
 
         assert reduction > 0.3
         for i in range(len(steps)):
@@ -194,7 +203,9 @@ class TestLargeTraceFixtureRoundTripAndSavings:
         for i, expected_heap in enumerate(original_heaps):
             assert decode_step_heap(encoded["steps"], i) == expected_heap
 
-    def test_gzip_payload_is_not_meaningfully_worse_on_this_empty_heap_fixture(self, capsys) -> None:
+    def test_gzip_payload_is_not_meaningfully_worse_on_this_empty_heap_fixture(
+        self, capsys
+    ) -> None:
         """`large_trace_40k` is a 40k-*step* stress fixture (a tight numeric
         loop, zero heap objects at every step, confirmed by
         `test_every_step_reconstructs_byte_identical_to_the_original`'s own
