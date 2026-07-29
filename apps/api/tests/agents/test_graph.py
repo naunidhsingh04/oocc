@@ -74,9 +74,11 @@ class _CountingExecutor:
         self._inner = inner
         self.execute_calls = 0
 
-    async def execute(self, source: str, *, stdin: str = "") -> dict:
+    async def execute(
+        self, source: str, *, stdin: str = "", wall_clock_limit_s: float | None = None
+    ) -> dict:
         self.execute_calls += 1
-        return await self._inner.execute(source, stdin=stdin)
+        return await self._inner.execute(source, stdin=stdin, wall_clock_limit_s=wall_clock_limit_s)
 
     async def execute_counters(self, source: str, *, stdin: str = "") -> dict:
         return await self._inner.execute_counters(source, stdin=stdin)

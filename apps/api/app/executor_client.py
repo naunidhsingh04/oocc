@@ -32,9 +32,17 @@ class ExecutorClient:
             timeout=timeout_s,
         )
 
-    async def execute(self, source: str, *, stdin: str = "") -> dict[str, Any]:
-        """Full trace via POST /execute."""
-        response = await self._client.post("/execute", json={"source": source, "stdin": stdin})
+    async def execute(
+        self, source: str, *, stdin: str = "", wall_clock_limit_s: float | None = None
+    ) -> dict[str, Any]:
+        """Full trace via POST /execute. `wall_clock_limit_s` is docs/PRD.md
+        §3.3's "5s (10s for authed users)" — callers pass the value that
+        distinction resolves to; omitted, the executor uses its own 5s
+        default."""
+        body: dict[str, Any] = {"source": source, "stdin": stdin}
+        if wall_clock_limit_s is not None:
+            body["wall_clock_limit_s"] = wall_clock_limit_s
+        response = await self._client.post("/execute", json=body)
         response.raise_for_status()
         result: dict[str, Any] = response.json()
         return result

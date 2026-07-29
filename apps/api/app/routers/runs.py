@@ -91,13 +91,17 @@ async def create_run(
     executor: ExecutorClient = Depends(get_executor_client),
     llm_client: LLMClient | None = Depends(get_llm_client),
     cache: Cache = Depends(get_cache),
+    user: User | None = Depends(get_current_user_optional),
 ) -> dict[str, Any]:
+    # docs/PRD.md §3.3: "5s (10s for authed users)".
+    wall_clock_limit_s = 10.0 if user is not None else 5.0
     result = await run_pipeline_cached(
         source=request.source,
         stdin=request.stdin,
         executor=executor,
         llm_client=llm_client,
         cache=cache,
+        wall_clock_limit_s=wall_clock_limit_s,
     )
     # §3.4 (Phase 6): every deterministic analyzer above already ran against
     # the raw, full-heap-per-step trace (and that's what's cached — see

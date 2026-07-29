@@ -43,14 +43,52 @@ services:
         condition: service_healthy
 
   # A separate container from day one (docs/PRD.md §5) — never in the API
-  # process, never in the API container. Phase 0 placeholder; Phase 1 adds
-  # the real sandbox (gVisor/nsjail, resource limits, no network).
+  # process, never in the API container.
+  #
+  # Hardening added during the pre-launch audit (docs/AUDIT.md Pass 1/2),
+  # every PRD §5 flag that has a direct Compose equivalent and doesn't
+  # conflict with this service's own job of *receiving* HTTP requests from
+  # `api`: read-only rootfs, a 16MB tmpfs /tmp, all capabilities dropped,
+  # no-new-privileges, a 256MB memory ceiling, 0.5 CPU, and a 32-process
+  # cap. **Not runtime-verified** — `docker` isn't installed in the sandbox
+  # this was written in, so this is a config-correctness change backed by
+  # reading the Compose Specification, not a live `docker compose up` test.
+  #
+  # Deliberately NOT set: `network_mode: none`. PRD §5 asks for it, but it
+  # would sever the *entire* container's networking, including the uvicorn
+  # server's own ability to receive `api`'s POST /execute over the compose
+  # bridge network — the sandbox boundary PRD means by "network: none" is
+  # the untrusted *user code's own* execution environment, which today
+  # shares a process (and therefore a network namespace) with the FastAPI
+  # server that has to stay reachable. Only gVisor/nsjail's per-run
+  # isolation (still unbuilt — see SECURITY.md) can give a single
+  # in-process `exec()` call its own network namespace without also
+  # cutting off the service that's supposed to answer HTTP requests.
+  # Setting this flag today would trade a real, working system for a
+  # broken one without closing the actual gap.
   executor:
     build:
       context: .
       dockerfile: services/executor/Dockerfile
     ports:
       - "8001:8001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 32
+    # 65534 is the conventional "nobody" uid/gid on Debian-family images
+    # (this Dockerfile's `python:3.12-slim` base) — non-root, per §5.
+    # Flagged for extra scrutiny before deploying: `COPY . .` in the
+    # Dockerfile copies the repo as whatever the build step's default
+    # ownership is, and this hasn't been runtime-verified to confirm uid
+    # 65534 can actually read its own application files inside the image.
+    user: "65534:65534"
 
   web:
     build:

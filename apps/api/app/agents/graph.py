@@ -158,6 +158,7 @@ async def run_pipeline_cached(
     executor: Any,
     llm_client: Any | None,
     cache: Cache,
+    wall_clock_limit_s: float | None = None,
 ) -> PipelineState:
     """docs/PRD.md §4.4: `sha256(source + stdin + language)` -> the trace
     and every deterministic output, 7-day TTL. On a hit, the executor never
@@ -200,15 +201,25 @@ async def run_pipeline_cached(
             "narration": step_ranges,
         }
 
-    trace = await executor.execute(source, stdin=stdin)
+    trace = await executor.execute(source, stdin=stdin, wall_clock_limit_s=wall_clock_limit_s)
     result = await run_pipeline(
         trace=trace, source=source, executor=executor, llm_client=llm_client
     )
 
-    to_cache = {
-        field: result[field]  # type: ignore[literal-required]
-        for field in _DETERMINISTIC_CACHE_FIELDS
-    }
-    await cache.set(key, json.dumps(to_cache))
+    # The cache key is sha256(source + stdin + language) only (§4.4) — it
+    # doesn't vary by caller, but `wall_clock_limit_s` now does (§3.3: 5s
+    # vs 10s authed). A `status: "timeout"` trace produced under the
+    # *shorter* budget must not be cached and then served to a later,
+    # authed caller who would have gotten a real completed run with more
+    # time — skip caching this one result shape rather than fragment the
+    # cache key (which would cost every other cache hit's hit rate for a
+    # narrow edge case: a program whose real running time happens to fall
+    # between 5s and 10s).
+    if trace.get("status") != "timeout":
+        to_cache = {
+            field: result[field]  # type: ignore[literal-required]
+            for field in _DETERMINISTIC_CACHE_FIELDS
+        }
+        await cache.set(key, json.dumps(to_cache))
 
     return result

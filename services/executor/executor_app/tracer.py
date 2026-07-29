@@ -27,6 +27,14 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
+try:
+    import resource  # POSIX-only (Linux/macOS) — no Windows equivalent.
+except ImportError:  # pragma: no cover - this sandbox and every real
+    # deployment target (Linux containers, macOS dev) has `resource`; a
+    # platform without it degrades to "no Python-level memory cap" rather
+    # than crashing this module at import time.
+    resource = None  # type: ignore[assignment]
+
 from executor_app.sandbox_imports import restricted_builtins
 
 USER_CODE_FILENAME = "<oocc-user>"
@@ -35,10 +43,49 @@ TOOL_ID = 3  # PEP 669: ids 0-5 exist; 0,1,2,5 are conventional names for
 # reserved by the interpreter itself. 3 and 4 have no conventional owner.
 MAX_INLINE_STR_LEN = 40
 SCHEMA_VERSION = "1.0"
+MAX_MEMORY_BYTES = 256 * 1024 * 1024  # docs/PRD.md §3.3: 256 MB
 
 
 class StepLimitReached(Exception):
-    """Internal control-flow signal — not part of the trace contract."""
+    """Internal control-flow signal — not part of the trace contract.
+    Raised specifically for a *step-count* breach (§3.3: `status:
+    step_limit`) — see `WallClockLimitReached` for the time-based sibling
+    that used to (incorrectly) share this same exception and therefore
+    this same status."""
+
+
+class WallClockLimitReached(StepLimitReached):
+    """A time, not step-count, breach — subclasses `StepLimitReached` so
+    any incidental `except StepLimitReached` elsewhere still catches it,
+    but is caught first, and separately, in `run()` so it maps to
+    `status: "timeout"` (§3.3), not `status: "step_limit"`. Before this
+    split, every wall-clock breach was misreported as a step-count breach
+    — found during the pre-launch audit's PRD traceability pass, confirmed
+    by `test_adversarial.py`'s own
+    `test_infinite_loop_is_stopped_by_wall_clock_not_left_to_run_forever`
+    asserting `status == "step_limit"` for a wall-clock-only stop."""
+
+
+def _set_memory_limit() -> None:
+    """Best-effort `RLIMIT_AS` cap (§3.3: 256 MB) — defense-in-depth
+    alongside (not a replacement for) the container-level `--memory` flag,
+    which this sandbox has no way to verify is actually applied (see
+    docs/AUDIT.md Pass 1/2). A soft rlimit a sufficiently adversarial
+    allocation pattern could still evade is a real improvement over the
+    "nothing catches this at all" state this was found in — a program that
+    allocates until it exhausts memory today either succeeds or gets
+    OOM-killed with no trace at all; this makes it fail as a normal,
+    reported `status: "memory_limit"` step instead."""
+    if resource is None:
+        return
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (MAX_MEMORY_BYTES, MAX_MEMORY_BYTES))
+    except (ValueError, OSError):
+        # Some platforms (notably macOS for RLIMIT_AS specifically) refuse
+        # to lower this limit in certain sandboxed/CI contexts — degrade to
+        # "no cap" rather than fail every single run over an unrelated
+        # platform quirk.
+        pass
 
 
 def _heap_key_repr(key: Any) -> str:
@@ -92,7 +139,7 @@ class Tracer:
         keep_head: int = 40_000,
         keep_tail: int = 10_000,
         max_heap_objects_per_step: int = 5_000,
-        wall_clock_limit_s: float = 15.0,
+        wall_clock_limit_s: float = 5.0,
         stdout_limit_bytes: int = 256_000,
     ) -> None:
         self.step_limit = step_limit
@@ -136,6 +183,7 @@ class Tracer:
         status = "ok"
         error_obj: dict[str, Any] | None = None
         self._start_time = time.monotonic()
+        _set_memory_limit()
 
         stdout_capture = _CapturingWriter(self._on_stdout_write)
         stdin_stream = io.StringIO(stdin)
@@ -150,8 +198,17 @@ class Tracer:
                 sys.stdin = stdin_stream
                 with contextlib.redirect_stdout(stdout_capture):
                     exec(code, run_globals)
+            except WallClockLimitReached:
+                status = "timeout"
             except StepLimitReached:
                 status = "step_limit"
+            except MemoryError:
+                # RLIMIT_AS (`_set_memory_limit` above) makes an
+                # over-budget allocation surface as a normal Python
+                # MemoryError instead of an OS-level OOM kill with no
+                # trace at all — docs/PRD.md §3.3's `status: memory_limit`,
+                # never produced anywhere before this fix.
+                status = "memory_limit"
             except BaseException as exc:  # noqa: BLE001 - deliberately broad: this *is* the sandbox boundary
                 status = "runtime_error"
                 error_obj = self._build_error(exc)
@@ -273,7 +330,7 @@ class Tracer:
 
     def _record_step(self, event: str, *, returned: Any = None, stdout_delta: str = "") -> None:
         if time.monotonic() - self._start_time > self.wall_clock_limit_s:
-            raise StepLimitReached
+            raise WallClockLimitReached
 
         self._state.executed_step_count += 1
         i = self._state.executed_step_count - 1
@@ -543,6 +600,7 @@ class CounterTracer:
 
         status = "ok"
         self._start_time = time.monotonic()
+        _set_memory_limit()
         stdin_stream = io.StringIO(stdin)
         real_stdin = sys.stdin
         devnull = io.StringIO()
@@ -553,8 +611,12 @@ class CounterTracer:
                 sys.stdin = stdin_stream
                 with contextlib.redirect_stdout(devnull):
                     exec(code, run_globals)
+            except WallClockLimitReached:
+                status = "timeout"
             except StepLimitReached:
                 status = "step_limit"
+            except MemoryError:
+                status = "memory_limit"
             except BaseException:  # noqa: BLE001 - deliberately broad: this *is* the sandbox boundary
                 status = "runtime_error"
             finally:
@@ -578,7 +640,7 @@ class CounterTracer:
             self._count % 4096 == 0
             and time.monotonic() - self._start_time > self.wall_clock_limit_s
         ):
-            raise StepLimitReached
+            raise WallClockLimitReached
 
 
 def _is_heap_type(obj: Any) -> bool:

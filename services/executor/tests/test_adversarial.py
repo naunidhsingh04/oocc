@@ -24,11 +24,21 @@ from executor_app.tracer import Tracer
 
 def test_infinite_loop_is_stopped_by_wall_clock_not_left_to_run_forever() -> None:
     start = time.monotonic()
-    tracer = Tracer(wall_clock_limit_s=0.5, keep_head=1000, keep_tail=0)
+    # step_limit deliberately far above what 0.5s of tracing this tight a
+    # loop can reach (full per-step frame/heap snapshotting is the
+    # dominant cost, not the loop body) — otherwise this test silently
+    # exercises the *step*-count path instead of the wall-clock one it's
+    # named for. Found for real during the pre-launch audit: the original
+    # version of this test used the default `step_limit=100_000`, which a
+    # loop this cheap reaches in ~0.3s, well under any wall-clock budget
+    # worth testing — the test was passing for the wrong reason, and
+    # "asserts status == step_limit" was quietly proving nothing about the
+    # wall-clock path at all.
+    tracer = Tracer(wall_clock_limit_s=0.5, step_limit=100_000_000, keep_head=1000, keep_tail=0)
     trace = tracer.run("i = 0\nwhile True:\n    i += 1\n")
     elapsed = time.monotonic() - start
 
-    assert trace["status"] == "step_limit"
+    assert trace["status"] == "timeout"
     assert elapsed < 5.0  # bounded, not "ran until the test harness killed it"
     assert trace["meta"]["truncated"] is True
 
@@ -70,19 +80,27 @@ def test_unicode_bomb_stdout_is_truncated_not_unbounded() -> None:
 
 
 def test_memory_growth_is_not_currently_bounded_by_the_tracer_itself() -> None:
-    """Documents a real, known gap rather than hiding it: nothing in
-    `Tracer` enforces PRD §3.3's 256MB memory limit — that's meant to come
-    from the OS-level sandbox (gVisor/nsjail, `--memory 256m`), which
-    doesn't exist yet in this deployment (see SECURITY.md). This test runs
-    a *safe*, small (~8MB) allocation — one big string, not a million-item
-    list (a list that size makes per-step heap *snapshotting* slow enough
-    to hit the wall-clock limit first, a different, already-covered gap,
-    and would stop this test before it demonstrated anything about memory
-    at all) — and confirms it succeeds with `status: ok` rather than being
-    stopped, proving the memory gap exists at a harmless scale rather than
-    actually exhausting memory on whatever machine runs this test suite. Do
-    not scale this up to prove the same point "more convincingly" — see
-    SECURITY.md for why 10GB was deliberately not attempted in this sandbox.
+    """Documents a real, known gap rather than hiding it. `Tracer.run` now
+    calls `resource.setrlimit(RLIMIT_AS, ...)` (docs/AUDIT.md Pass 2) — but
+    that was directly tested against a real oversized allocation during the
+    audit and confirmed **not reliably enforced on macOS** (the process's
+    real memory kept growing past 3GB instead of raising `MemoryError`;
+    had to be killed by hand). The actual, reliable enforcement PRD §3.3
+    means is meant to come from the OS-level sandbox (gVisor/nsjail,
+    `--memory 256m`), which doesn't exist yet in this deployment (see
+    SECURITY.md). This test runs a *safe*, small (~8MB) allocation — one
+    big string, not a million-item list (a list that size makes per-step
+    heap *snapshotting* slow enough to hit the wall-clock limit first, a
+    different, already-covered gap, and would stop this test before it
+    demonstrated anything about memory at all) — and confirms it succeeds
+    with `status: ok` rather than being stopped. This is deliberately not
+    a test of whether the 256MB limit holds (see docs/AUDIT.md Pass 2 for
+    exactly why that's dangerous to automate: it nearly exhausted this
+    sandbox's own memory during manual verification) — only that a small,
+    harmless allocation is never mistakenly blocked. Do not scale this up
+    to "prove the point more convincingly" — see SECURITY.md for why 10GB
+    was deliberately not attempted in this sandbox, and docs/AUDIT.md Pass
+    2 for why a real enforcement test isn't automated here either.
     """
     trace = Tracer(keep_head=100, keep_tail=0, wall_clock_limit_s=5.0).run(
         "data = 'x' * 8_000_000\nprint(len(data))\n"
