@@ -23,13 +23,7 @@ export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowEle
 
 export function TableHeaderCell({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <th
-      className={cn(
-        "px-3 py-2 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft",
-        className,
-      )}
-      {...props}
-    />
+    <th className={cn("px-3 py-2 font-body text-[12px] font-semibold text-ink-soft", className)} {...props} />
   );
 }
 

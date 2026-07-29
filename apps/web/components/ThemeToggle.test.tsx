@@ -1,45 +1,49 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useTheme } from "next-themes";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { ThemeToggle } from "./ThemeToggle";
 
-vi.mock("next-themes", () => ({
-  useTheme: vi.fn(),
-}));
+beforeEach(() => {
+  localStorage.clear();
+  document.documentElement.removeAttribute("data-theme");
+});
 
-const mockUseTheme = vi.mocked(useTheme);
+function renderPicker() {
+  return render(
+    <ThemeProvider>
+      <ThemeToggle />
+    </ThemeProvider>,
+  );
+}
 
 describe("ThemeToggle", () => {
-  it("switches to dark when currently light", async () => {
-    const setTheme = vi.fn();
-    mockUseTheme.mockReturnValue({
-      resolvedTheme: "light",
-      setTheme,
-      themes: ["light", "dark"],
-    });
+  it("opens a list of all five presets and switches on selection", async () => {
     const user = userEvent.setup();
+    renderPicker();
 
-    render(<ThemeToggle />);
-    const button = await screen.findByRole("button", { name: "Switch to dark mode" });
-    await user.click(button);
+    const trigger = await screen.findByRole("button", { name: /Theme: Paper/ });
+    await user.click(trigger);
 
-    expect(setTheme).toHaveBeenCalledWith("dark");
+    expect(screen.getByRole("option", { name: "Slate" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Midnight" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Sepia" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Mist" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("option", { name: "Slate" }));
+
+    expect(document.documentElement.getAttribute("data-theme")).toBe("slate");
+    expect(await screen.findByRole("button", { name: /Theme: Slate/ })).toBeInTheDocument();
   });
 
-  it("switches to light when currently dark", async () => {
-    const setTheme = vi.fn();
-    mockUseTheme.mockReturnValue({
-      resolvedTheme: "dark",
-      setTheme,
-      themes: ["light", "dark"],
-    });
+  it("closes on Escape without changing the theme", async () => {
     const user = userEvent.setup();
+    renderPicker();
 
-    render(<ThemeToggle />);
-    const button = await screen.findByRole("button", { name: "Switch to light mode" });
-    await user.click(button);
+    await user.click(await screen.findByRole("button", { name: /Theme: Paper/ }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
-    expect(setTheme).toHaveBeenCalledWith("light");
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
   });
 });

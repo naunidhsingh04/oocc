@@ -16,9 +16,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       type={type}
       data-active={active || undefined}
       className={cn(
-        "inline-flex h-8 w-8 items-center justify-center rounded-control border border-transparent text-ink-soft transition-colors hover:border-rule hover:bg-paper hover:text-ink",
-        "data-[active]:border-rule data-[active]:bg-paper data-[active]:text-signal",
-        "disabled:pointer-events-none disabled:opacity-40",
+        "inline-flex h-8 w-8 items-center justify-center rounded-control border border-transparent text-ink-soft transition-[color,background-color,border-color,transform] duration-150 hover:border-rule hover:bg-raised hover:text-ink active:scale-90",
+        "data-[active]:border-rule data-[active]:bg-raised data-[active]:text-signal",
+        "disabled:pointer-events-none disabled:opacity-40 disabled:active:scale-100",
         className,
       )}
       {...props}

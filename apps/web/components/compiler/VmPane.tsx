@@ -28,10 +28,12 @@ export interface VmPaneProps {
 }
 
 /**
- * The VM pane (docs/PRD.md §7): pc indicator (via `BytecodePane`'s
+ * The Run tab (docs/PRD.md §7): pc indicator (via `BytecodePane`'s
  * `currentPc` prop, driven by the same `step` this pane holds), an
  * animated stack, a globals table, output, and the ribbon reused for VM
- * steps.
+ * steps — all one calm surface with spacing instead of borders between
+ * its own sections, since it's the only tab open at a time now, not one
+ * of five panes competing for a border.
  */
 export function VmPane({
   steps,
@@ -54,8 +56,8 @@ export function VmPane({
     .join("");
 
   return (
-    <div className="flex h-full flex-col" data-testid="compiler-vm-pane">
-      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-rule px-2">
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-3" data-testid="compiler-vm-pane">
+      <div className="flex shrink-0 items-center gap-1">
         <IconButton aria-label="Jump to start" disabled={disabled} onClick={() => jumpTo(0)}>
           <SkipToStartIcon />
         </IconButton>
@@ -71,7 +73,7 @@ export function VmPane({
         <IconButton aria-label="Jump to end" disabled={disabled} onClick={() => jumpTo(lastIndex)}>
           <SkipToEndIcon />
         </IconButton>
-        <span className="ml-2 font-mono-label text-[11px] tabular-nums text-ink-soft">
+        <span className="ml-2 font-mono-label text-[12px] tabular-nums text-ink-soft">
           step {steps.length === 0 ? 0 : currentStep} / {lastIndex}
           {step ? ` · pc ${step.pc}` : ""}
         </span>
@@ -79,30 +81,30 @@ export function VmPane({
 
       <CompilerRibbon ticks={ticks} currentStep={currentStep} onScrub={jumpTo} />
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-0 border-t border-rule">
-        <div className="min-h-0 border-r border-rule">
-          <div className="border-b border-rule px-2 py-1 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
+      <div className="grid min-h-0 grid-cols-2 gap-3">
+        <div className="min-h-0 rounded-panel border border-rule">
+          <div className="px-3 py-2 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
             Stack
           </div>
-          <div className="h-[calc(100%-25px)]">
+          <div className="h-40">
             <StackView stack={step?.stackAfter ?? []} />
           </div>
         </div>
-        <div className="flex min-h-0 flex-col">
-          <div className="border-b border-rule px-2 py-1 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
+        <div className="flex min-h-0 flex-col rounded-panel border border-rule">
+          <div className="px-3 py-2 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
             Globals
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="h-40 overflow-y-auto">
             <GlobalsTable globals={step?.globals ?? {}} />
           </div>
         </div>
       </div>
 
-      <div className="h-24 shrink-0 border-t border-rule">
-        <div className="border-b border-rule px-2 py-1 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
+      <div className="min-h-24 shrink-0 rounded-panel border border-rule">
+        <div className="px-3 py-2 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
           Output
         </div>
-        <pre className="h-[calc(100%-25px)] overflow-y-auto whitespace-pre-wrap px-2 py-1 font-editor text-[13px] text-ink">
+        <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap px-3 pb-2 font-editor text-[13px] text-ink">
           {stdoutSoFar || " "}
         </pre>
       </div>

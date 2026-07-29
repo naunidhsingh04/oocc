@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { cn } from "@oocc/ui";
 import { useCompilerHighlight } from "@/lib/compiler/highlightStore";
@@ -77,19 +78,25 @@ function TreeRow({ node, depth }: TreeRowProps) {
   const selectedAstId = useCompilerHighlight((s) => s.selectedAstId);
   const setHover = useCompilerHighlight((s) => s.setHover);
   const setSelected = useCompilerHighlight((s) => s.setSelected);
+  const reduceMotion = useReducedMotion();
 
   const isSelected = node.id === selectedAstId;
   const isHovered = node.id === hoverAstId;
 
   return (
     <div>
-      <div
+      <motion.div
+        layout
+        initial={reduceMotion ? false : { opacity: 0, x: -6 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -6 }}
+        transition={{ duration: reduceMotion ? 0.01 : 0.16, ease: "easeOut" }}
         className={cn(
-          "flex cursor-pointer items-center gap-1 rounded-control px-1 py-0.5 font-mono-label text-[11px]",
+          "flex cursor-pointer items-center gap-1.5 rounded-control px-2 py-1 font-mono-label text-[12px] transition-colors duration-150 active:scale-[0.99]",
           isSelected && "bg-[color-mix(in_srgb,var(--color-signal)_16%,transparent)] text-signal",
           isHovered && !isSelected && "bg-[color-mix(in_srgb,var(--color-signal)_8%,transparent)]",
         )}
-        style={{ paddingLeft: depth * 14 + 4 }}
+        style={{ paddingLeft: depth * 16 + 8 }}
         onMouseEnter={() => setHover(node.id)}
         onMouseLeave={() => setHover(null)}
         onClick={(event) => {
@@ -101,7 +108,7 @@ function TreeRow({ node, depth }: TreeRowProps) {
           <button
             type="button"
             aria-label={collapsed ? "Expand" : "Collapse"}
-            className="w-3 shrink-0 text-ink-soft"
+            className="w-4 shrink-0 text-ink-soft transition-colors duration-150 hover:text-ink"
             onClick={(event) => {
               event.stopPropagation();
               setCollapsed((v) => !v);
@@ -110,12 +117,14 @@ function TreeRow({ node, depth }: TreeRowProps) {
             {collapsed ? "+" : "−"}
           </button>
         ) : (
-          <span className="w-3 shrink-0" />
+          <span className="w-4 shrink-0" />
         )}
         <span className="text-ink-soft">#{node.id}</span>
         <span className="text-ink">{summarize(node)}</span>
-      </div>
-      {!collapsed && kids.map((child) => <TreeRow key={child.id} node={child} depth={depth + 1} />)}
+      </motion.div>
+      <AnimatePresence initial={false}>
+        {!collapsed && kids.map((child) => <TreeRow key={child.id} node={child} depth={depth + 1} />)}
+      </AnimatePresence>
     </div>
   );
 }
@@ -127,10 +136,10 @@ export interface AstPaneProps {
 /** The AST as a collapsible tree (docs/PRD.md §7). */
 export function AstPane({ ast }: AstPaneProps) {
   if (!ast) {
-    return <div className="p-2 font-mono-label text-[11px] text-ink-soft">No AST yet.</div>;
+    return <div className="p-4 font-mono-label text-[12px] text-ink-soft">No AST yet.</div>;
   }
   return (
-    <div className="h-full overflow-y-auto p-1" data-testid="compiler-ast-pane">
+    <div className="h-full overflow-y-auto p-2" data-testid="compiler-ast-pane">
       <TreeRow node={ast} depth={0} />
     </div>
   );

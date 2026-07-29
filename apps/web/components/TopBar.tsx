@@ -2,6 +2,7 @@
 
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { Button, cn, CommandIcon } from "@oocc/ui";
+import { motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
@@ -24,14 +25,20 @@ export interface TopBarProps {
   onOpenPalette: () => void;
 }
 
-/** docs/PRD.md §6.4: a 40px bar — logo, nav, and the ⌘K trigger. */
+/**
+ * docs/PRD.md §6: a header with real presence — the logo carries weight,
+ * the active nav item gets a sliding underline (not just a color swap),
+ * and the bar itself has enough vertical room to not read as a dense
+ * toolbar. Taller than the original 40px bar this replaces.
+ */
 export function TopBar({ onOpenPalette }: TopBarProps) {
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
 
   return (
-    <header className="flex h-10 shrink-0 items-center justify-between border-b border-rule bg-panel px-3">
-      <div className="flex items-center gap-4">
-        <Link href="/" className="font-mono-label text-[13px] uppercase tracking-[0.06em] text-ink">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b border-rule bg-panel px-4">
+      <div className="flex items-center gap-6">
+        <Link href="/" className="font-display text-[17px] font-bold tracking-[-0.02em] text-ink">
           OOCC
         </Link>
         <nav className="flex items-center gap-1" aria-label="Primary">
@@ -43,17 +50,24 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded-control px-2 py-1 font-body text-[13px] font-medium transition-colors",
-                  active ? "text-signal" : "text-ink-soft hover:text-ink",
+                  "relative rounded-control px-3 py-2 font-body text-[14px] font-medium transition-colors duration-150",
+                  active ? "text-ink" : "text-ink-soft hover:text-ink",
                 )}
               >
                 {link.label}
+                {active ? (
+                  <motion.span
+                    layoutId="topbar-nav-underline"
+                    className="absolute inset-x-3 -bottom-[3px] h-0.5 rounded-full bg-signal"
+                    transition={{ duration: reduceMotion ? 0.01 : 0.18, ease: "easeOut" }}
+                  />
+                ) : null}
               </Link>
             );
           })}
         </nav>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <SettingsPanel />
         <ThemeToggle />
         <Button variant="secondary" size="sm" onClick={onOpenPalette}>

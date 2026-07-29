@@ -5,7 +5,7 @@ import type { TickInfo } from "@/lib/player/ticks";
 import { readRibbonColors } from "@/components/ribbon/colors";
 import { drawRibbon } from "@/components/ribbon/draw";
 import { computeTickBins, xToStep } from "@/components/ribbon/tickBins";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/lib/theme/ThemeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const RIBBON_HEIGHT = 40;

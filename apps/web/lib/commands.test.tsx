@@ -1,17 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
-import { ThemeProvider } from "next-themes";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
+import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { useCommandRegistry } from "./commands";
 import { usePlayerStore } from "./player";
 import { loadFixture } from "./player/testHelpers";
 
 function wrapper({ children }: { children: ReactNode }) {
-  return (
-    <ThemeProvider attribute="data-theme" defaultTheme="light" enableSystem={false}>
-      {children}
-    </ThemeProvider>
-  );
+  return <ThemeProvider>{children}</ThemeProvider>;
 }
 
 beforeEach(() => {

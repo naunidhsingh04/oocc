@@ -76,8 +76,8 @@ if (typeof window.localStorage === "undefined") {
   });
 }
 
-// jsdom has no matchMedia; next-themes' ThemeProvider checks it on mount to
-// resolve the "system" theme.
+// jsdom has no matchMedia; lib/theme/ThemeProvider.tsx checks it on mount to
+// resolve the OS's light/dark preference on a genuinely first visit.
 if (typeof window.matchMedia === "undefined") {
   window.matchMedia = (query: string) => ({
     matches: false,

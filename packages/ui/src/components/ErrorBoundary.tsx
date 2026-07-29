@@ -51,8 +51,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         role="alert"
         className="flex h-full min-h-0 flex-col items-center justify-center gap-2 border border-mutate bg-panel p-4 text-center"
       >
-        <span className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-mutate">
-          {this.props.title ? `${this.props.title} hit an error` : "This panel hit an error"}
+        <span className="font-body text-[13px] font-semibold text-mutate">
+          {this.props.title ? `${this.props.title} ran into a problem` : "This panel ran into a problem"}
         </span>
         <span className="max-w-xs font-body text-[12px] text-ink-soft">{error.message}</span>
         <Button variant="secondary" size="sm" onClick={this.handleRetry}>

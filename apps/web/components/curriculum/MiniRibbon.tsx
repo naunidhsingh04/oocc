@@ -2,7 +2,7 @@
 
 import type { LoopScope } from "@/lib/player";
 import type { TickInfo } from "@/lib/player/ticks";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/lib/theme/ThemeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readRibbonColors } from "@/components/ribbon/colors";
 import { drawRibbon } from "@/components/ribbon/draw";

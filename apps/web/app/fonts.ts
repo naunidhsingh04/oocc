@@ -15,7 +15,11 @@ export const chivo = Chivo({
 
 export const publicSans = Public_Sans({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  // 600/700 added alongside the original 400/500 (docs/PRD.md §6.2) so nav,
+  // panel headers, and buttons get real weight contrast against body text
+  // instead of everything sitting at 400-500 and leaning on IBM Plex Mono
+  // for structure — mono is reserved for code/tokens/bytecode/values now.
+  weight: ["400", "500", "600", "700"],
   variable: "--font-public-sans",
   display: "swap",
 });

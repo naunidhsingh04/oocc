@@ -56,7 +56,7 @@ export function CommandPalette({
           <Command.Group
             key={groupName}
             heading={groupName}
-            className="px-2 py-1.5 [&_[cmdk-group-heading]]:mb-1 [&_[cmdk-group-heading]]:px-1 [&_[cmdk-group-heading]]:font-mono-label [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.06em] [&_[cmdk-group-heading]]:text-ink-soft"
+            className="px-2 py-1.5 [&_[cmdk-group-heading]]:mb-1 [&_[cmdk-group-heading]]:px-1 [&_[cmdk-group-heading]]:font-body [&_[cmdk-group-heading]]:text-[12px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:text-ink-soft"
           >
             {items.map((item) => (
               <Command.Item

@@ -27,7 +27,7 @@ describe("ErrorBoundary", () => {
         <Bomb shouldThrow />
       </ErrorBoundary>,
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("Widget hit an error");
+    expect(screen.getByRole("alert")).toHaveTextContent("Widget ran into a problem");
     expect(screen.getByText("boom")).toBeInTheDocument();
     spy.mockRestore();
   });

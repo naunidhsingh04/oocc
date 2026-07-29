@@ -6,7 +6,7 @@ import { orderReviewQueue } from "@/lib/progress/reviewQueue";
 import { buildAttemptedConceptViews, buildConceptViews } from "@/lib/progress/views";
 import { selectWeakConcepts } from "@/lib/progress/weakConcepts";
 import type { ProgressRecord } from "@/lib/progress/types";
-import { Chip, ErrorBoundary } from "@oocc/ui";
+import { Chip, ErrorBoundary, Stagger, StaggerItem } from "@oocc/ui";
 import { useEffect, useState } from "react";
 import { ConceptGraph } from "./ConceptGraph";
 import { ReviewQueue } from "./ReviewQueue";
@@ -60,32 +60,36 @@ export function ProgressDashboard() {
       : orderReviewQueue(attemptedViews, now);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-      <div className="flex shrink-0 items-center gap-3">
-        <h1 className="font-display text-[15px] font-semibold tracking-[-0.02em] text-ink">Progress</h1>
+    <Stagger className="flex min-h-0 flex-1 flex-col gap-5 p-5">
+      <StaggerItem className="flex shrink-0 items-center gap-3">
+        <h1 className="font-display text-[18px] font-bold tracking-[-0.02em] text-ink">Progress</h1>
         {isDemo ? (
           <Chip tone="warn">Demo data — sign in to track your own progress</Chip>
         ) : (
           <Chip tone="ok">Live — your progress</Chip>
         )}
-      </div>
+      </StaggerItem>
 
-      <ErrorBoundary title="Concept graph">
-        <ConceptGraph views={conceptViews} />
-      </ErrorBoundary>
+      <StaggerItem>
+        <ErrorBoundary title="Concept graph">
+          <ConceptGraph views={conceptViews} />
+        </ErrorBoundary>
+      </StaggerItem>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <StaggerItem className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ErrorBoundary title="Review queue">
           <ReviewQueue queue={reviewQueueViews} now={now} />
         </ErrorBoundary>
         <ErrorBoundary title="Weak concepts">
           <WeakConcepts concepts={weakConcepts} />
         </ErrorBoundary>
-      </div>
+      </StaggerItem>
 
-      <ErrorBoundary title="Run history">
-        <RunHistory />
-      </ErrorBoundary>
-    </div>
+      <StaggerItem>
+        <ErrorBoundary title="Run history">
+          <RunHistory />
+        </ErrorBoundary>
+      </StaggerItem>
+    </Stagger>
   );
 }

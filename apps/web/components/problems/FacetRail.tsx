@@ -19,7 +19,7 @@ export interface FacetRailProps {
 function FacetGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border-b border-rule px-3 py-3">
-      <div className="mb-2 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">{title}</div>
+      <div className="mb-2 font-body text-[12px] font-semibold text-ink-soft">{title}</div>
       <div className="flex flex-col gap-1">{children}</div>
     </div>
   );
@@ -53,8 +53,8 @@ function FacetCheckbox({
 export function FacetRail({ state, onChange, tags, counts }: FacetRailProps) {
   return (
     <aside className="w-48 shrink-0 overflow-y-auto border-r border-rule bg-panel">
-      <div className="border-b border-rule px-3 py-2 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
-        {counts.filtered} / {counts.total} problems
+      <div className="border-b border-rule px-3 py-2.5 font-body text-[13px] font-medium text-ink-soft">
+        {counts.filtered} of {counts.total} problems
       </div>
       <FacetGroup title="Difficulty">
         {DIFFICULTIES.map((d) => (

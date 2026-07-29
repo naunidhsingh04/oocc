@@ -7,15 +7,19 @@ export interface PanelProps extends HTMLAttributes<HTMLDivElement> {
   bodyClassName?: string;
 }
 
-/** docs/PRD.md §6.2: panels are 0px radius, 1px --rule border, mono uppercase header. */
+/** docs/PRD.md §6: 8px radius, a soft shadow rather than a hard hairline
+ * carrying the panel's edge, a proper UI typeface header (sentence case,
+ * real weight) rather than mono-uppercase — the "instrument" reading mono
+ * labels gave every panel is exactly what the new warmer direction retires. */
 export function Panel({ title, actions, className, bodyClassName, children, ...props }: PanelProps) {
   return (
-    <div className={cn("flex flex-col rounded-panel border border-rule bg-panel", className)} {...props}>
+    <div
+      className={cn("flex flex-col rounded-panel border border-rule bg-panel shadow-card", className)}
+      {...props}
+    >
       {title ? (
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-rule px-3">
-          <h3 className="truncate font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
-            {title}
-          </h3>
+        <div className="flex h-10 shrink-0 items-center justify-between border-b border-rule px-3.5">
+          <h3 className="truncate font-body text-[13px] font-semibold text-ink-soft">{title}</h3>
           {actions ? <div className="flex items-center gap-1">{actions}</div> : null}
         </div>
       ) : null}

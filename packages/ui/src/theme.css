@@ -1,63 +1,91 @@
 /*
- * OOCC design tokens — docs/PRD.md §6.2.
+ * OOCC design tokens — docs/PRD.md §6.
  *
- * Light mode is the default surface; dark mode redefines the same custom
- * properties under [data-theme="dark"], so components never need `dark:`
- * variants — they just use `bg-paper`, `text-ink`, etc. and repaint for free.
- * The theme toggle in apps/web sets `data-theme` on <html> via next-themes.
+ * Five named presets (Slate, Paper, Midnight, Sepia, Mist — `[data-theme]`
+ * on <html>, set by apps/web/lib/theme/ThemeProvider.tsx) redefine the same
+ * custom properties, so components never write theme-specific variants or
+ * branch on which preset is active — they just use `bg-panel`, `text-ink`,
+ * etc. and repaint for free. Paper is both the default preset (no
+ * `data-theme` attribute resolves to it, matching the @theme block below)
+ * and named explicitly as `[data-theme="paper"]` so a JS-driven switch back
+ * to Paper always matches a real block instead of relying on "no attribute."
  *
- * Channel-color and text-role hex values are chosen so every combination
- * clears the docs/PRD.md §9 quality floor (>=4.5:1 for text, >=3:1 for
- * channel colors, both measured against --panel).
+ * Every preset defines the full token set: page background, panel
+ * background, a raised-surface tint (docs/PRD.md §6.4: "the active pane
+ * sits slightly raised"), a border, three text roles (primary/secondary/
+ * muted), the accent, --mutate/--ok/--warn, the eight channel colors, and
+ * the four pipeline-stage colors (lex/parse/compile/run). Channel colors
+ * and stage colors both alias signal/mutate/ok/warn for their first four
+ * slots (docs/PRD.md §6.2's original convention) plus four more hues per
+ * preset — this halves how many genuinely new colors each preset has to
+ * invent while keeping eight distinguishable channels and four distinguishable
+ * stages.
  *
  * `static` (not plain `@theme`): Tailwind v4 tree-shakes theme variables it
  * can't detect as "used" by scanning source text for literal utility-class
  * or `var(--...)` occurrences. Several tokens here — most importantly the
- * eight channel colors — are only ever referenced via a runtime template
- * literal (`` `var(--color-ch-${n})` `` in lib/player/channels.ts,
- * Chip.tsx, the ribbon, the editor gutters, ...), which that scan can't
- * see. Without `static`, Tailwind silently drops whichever of those aren't
- * also coincidentally hardcoded as a literal string somewhere else, and a
- * variable-to-channel color goes missing with no build error — exactly
- * what happened before this comment was added.
+ * eight channel colors and four stage colors — are only ever referenced via
+ * a runtime template literal (`` `var(--color-ch-${n})` `` in
+ * lib/player/channels.ts, Chip.tsx, the ribbon, the editor gutters, ...),
+ * which that scan can't see. Without `static`, Tailwind silently drops
+ * whichever of those aren't also coincidentally hardcoded as a literal
+ * string somewhere else, and a variable-to-channel color goes missing with
+ * no build error — exactly what happened before this comment was added.
  */
 @theme static {
-  /* Color: paper/panel/rule/ink/signal/mutate */
-  --color-paper: #edf0f3;
+  /* Paper (docs/PRD.md §6.2) — light, warm off-white. The default: what
+     renders before ThemeProvider's no-flash script or React have run. */
+  --color-paper: #faf8f5;
   --color-panel: #ffffff;
-  --color-rule: #d2d9e0;
-  --color-ink: #0e1116;
-  --color-ink-soft: #5a6572;
-  --color-signal: #1b4de4;
-  --color-mutate: #d6006e;
-  --color-ok: #0b7a4b;
-  --color-warn: #b45309;
+  --color-raised: #ffffff;
+  --color-rule: #e4ded4;
+  --color-ink: #22201b;
+  --color-ink-soft: #6b6459;
+  --color-ink-muted: #9b948a;
+  --color-signal: #1d9e75;
+  --color-mutate: #d6467a;
+  --color-ok: #3f9142;
+  --color-warn: #c97a24;
 
   /* Color: channels — one stable color per traced variable, reused across
      the editor gutter, variables panel, array bars, and timeline. */
-  --color-ch-1: #1b4de4;
-  --color-ch-2: #d6006e;
-  --color-ch-3: #0b7a4b;
-  --color-ch-4: #b45309;
-  --color-ch-5: #6d28d9;
-  --color-ch-6: #0e7490;
-  --color-ch-7: #be123c;
-  --color-ch-8: #4d7c0f;
+  --color-ch-1: var(--color-signal);
+  --color-ch-2: var(--color-mutate);
+  --color-ch-3: var(--color-ok);
+  --color-ch-4: var(--color-warn);
+  --color-ch-5: #7a6fd9;
+  --color-ch-6: #0e8a8a;
+  --color-ch-7: #b0473f;
+  --color-ch-8: #5c7a1f;
 
-  /* Geometry: 3px radius on controls, 0px on panels. */
-  --radius-control: 3px;
-  --radius-panel: 0px;
+  /* Color: pipeline stages (docs/PRD.md §6) — lex/parse get their own cool
+     hues, compile borrows --warn (in progress), run borrows --signal (the
+     accent, since finishing the pipeline is the payoff). */
+  --color-stage-lex: var(--color-ch-5);
+  --color-stage-parse: var(--color-ch-6);
+  --color-stage-compile: var(--color-warn);
+  --color-stage-run: var(--color-signal);
+
+  /* Geometry (docs/PRD.md §6): 6px radius on controls, 8px on panels — a
+     workshop's rounded-over edges, not a lab bench's square corners. */
+  --radius-control: 6px;
+  --radius-panel: 8px;
 
   /* Spacing base is 4px — this is already Tailwind's default scale unit
      (--spacing: 0.25rem), so it is not overridden here. */
 
-  /* The one shadow allowed anywhere: floating menus (command palette,
-     tooltips). Everything else uses the 1px --rule hairline, no shadow. */
-  --shadow-menu: 0 1px 2px rgb(14 17 22 / 0.16);
+  /* Soft shadows (docs/PRD.md §6) replace most hairlines: --shadow-card for
+     a panel at rest, --shadow-raised for the active pane, --shadow-menu for
+     floating surfaces (command palette, tooltips, toasts). */
+  --shadow-card: 0 1px 2px rgb(34 32 27 / 0.06), 0 2px 8px rgb(34 32 27 / 0.05);
+  --shadow-raised: 0 2px 6px rgb(34 32 27 / 0.08), 0 8px 20px rgb(34 32 27 / 0.08);
+  --shadow-menu: 0 4px 16px rgb(34 32 27 / 0.14);
 
   /* Type. Actual font files are loaded via next/font in apps/web, which
      assigns these inner --font-<family> variables on <html>; the tokens
-     below are what components reference. */
+     below are what components reference. Monospace is reserved for code,
+     tokens, bytecode, and values (docs/PRD.md §6) — nav, tab labels, panel
+     headers, buttons, and body text all use --font-body/--font-display. */
   --font-display: var(--font-chivo), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono-label: var(--font-ibm-plex-mono), ui-monospace, "SF Mono", monospace;
@@ -75,7 +103,9 @@
     color-scheme: light;
   }
 
-  [data-theme="dark"] {
+  [data-theme="slate"],
+  [data-theme="midnight"],
+  [data-theme="sepia"] {
     color-scheme: dark;
   }
 
@@ -121,29 +151,171 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* Skeleton shimmer (docs/PRD.md §6) — a soft sweep across a muted block,
+     not a bare pulse; see packages/ui/src/components/Skeleton.tsx. The
+     reduced-motion rule above collapses its duration to ~0, which reads as
+     a static muted tint rather than a stuck animation. */
+  @keyframes oocc-shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
 }
 
-/* Dark mode — first-class second (docs/PRD.md §6.2). Unlayered, so this
-   always wins over the @theme layer regardless of source order. */
-[data-theme="dark"] {
-  --color-paper: #0b0d10;
-  --color-panel: #14171c;
-  --color-rule: #262b33;
-  --color-ink: #edf0f3;
-  --color-ink-soft: #93a0ad;
-  --color-signal: #5b84ff;
-  --color-mutate: #ff4fa0;
-  --color-ok: #2fbe83;
-  --color-warn: #e0922f;
+/* Unlayered, so each preset always wins over the @theme layer regardless of
+   source order (docs/PRD.md §6). Paper repeats the @theme defaults above so
+   an explicit `data-theme="paper"` — set once ThemeProvider mounts — matches
+   a real block instead of depending on "no attribute" as its only definition. */
+[data-theme="paper"] {
+  --color-paper: #faf8f5;
+  --color-panel: #ffffff;
+  --color-raised: #ffffff;
+  --color-rule: #e4ded4;
+  --color-ink: #22201b;
+  --color-ink-soft: #6b6459;
+  --color-ink-muted: #9b948a;
+  --color-signal: #1d9e75;
+  --color-mutate: #d6467a;
+  --color-ok: #3f9142;
+  --color-warn: #c97a24;
+  --color-ch-1: var(--color-signal);
+  --color-ch-2: var(--color-mutate);
+  --color-ch-3: var(--color-ok);
+  --color-ch-4: var(--color-warn);
+  --color-ch-5: #7a6fd9;
+  --color-ch-6: #0e8a8a;
+  --color-ch-7: #b0473f;
+  --color-ch-8: #5c7a1f;
+  --color-stage-lex: var(--color-ch-5);
+  --color-stage-parse: var(--color-ch-6);
+  --color-stage-compile: var(--color-warn);
+  --color-stage-run: var(--color-signal);
+  --shadow-card: 0 1px 2px rgb(34 32 27 / 0.06), 0 2px 8px rgb(34 32 27 / 0.05);
+  --shadow-raised: 0 2px 6px rgb(34 32 27 / 0.08), 0 8px 20px rgb(34 32 27 / 0.08);
+  --shadow-menu: 0 4px 16px rgb(34 32 27 / 0.14);
+}
 
-  --color-ch-1: #5b84ff;
-  --color-ch-2: #ff4fa0;
-  --color-ch-3: #2fbe83;
-  --color-ch-4: #e0922f;
-  --color-ch-5: #a78bfa;
-  --color-ch-6: #22d3ee;
-  --color-ch-7: #fb7185;
-  --color-ch-8: #a3e635;
+/* Mist — light, cool grey. The other light preset: same warmth of
+   geometry, a cooler ground for rooms that want less amber in them. */
+[data-theme="mist"] {
+  --color-paper: #f4f6f8;
+  --color-panel: #ffffff;
+  --color-raised: #ffffff;
+  --color-rule: #dbe2e8;
+  --color-ink: #1a222b;
+  --color-ink-soft: #5b6773;
+  --color-ink-muted: #93a0ab;
+  --color-signal: #378adb;
+  --color-mutate: #c94577;
+  --color-ok: #2f9563;
+  --color-warn: #b8791f;
+  --color-ch-1: var(--color-signal);
+  --color-ch-2: var(--color-mutate);
+  --color-ch-3: var(--color-ok);
+  --color-ch-4: var(--color-warn);
+  --color-ch-5: #6f6fd0;
+  --color-ch-6: #0a8f97;
+  --color-ch-7: #b04a4a;
+  --color-ch-8: #5c7a3a;
+  --color-stage-lex: var(--color-ch-5);
+  --color-stage-parse: var(--color-ch-6);
+  --color-stage-compile: var(--color-warn);
+  --color-stage-run: var(--color-signal);
+  --shadow-card: 0 1px 2px rgb(26 34 43 / 0.06), 0 2px 8px rgb(26 34 43 / 0.05);
+  --shadow-raised: 0 2px 6px rgb(26 34 43 / 0.08), 0 8px 20px rgb(26 34 43 / 0.09);
+  --shadow-menu: 0 4px 16px rgb(26 34 43 / 0.16);
+}
 
-  --shadow-menu: 0 1px 2px rgb(0 0 0 / 0.6);
+/* Slate — dark, cool grey-blue. */
+[data-theme="slate"] {
+  --color-paper: #161b22;
+  --color-panel: #1c232c;
+  --color-raised: #242c36;
+  --color-rule: #2e3742;
+  --color-ink: #e8ecf1;
+  --color-ink-soft: #9aa7b4;
+  --color-ink-muted: #667080;
+  --color-signal: #4ec9b0;
+  --color-mutate: #f7768e;
+  --color-ok: #79c884;
+  --color-warn: #e5a45b;
+  --color-ch-1: var(--color-signal);
+  --color-ch-2: var(--color-mutate);
+  --color-ch-3: var(--color-ok);
+  --color-ch-4: var(--color-warn);
+  --color-ch-5: #b39ef0;
+  --color-ch-6: #63c9e6;
+  --color-ch-7: #f0918f;
+  --color-ch-8: #a8cf6a;
+  --color-stage-lex: var(--color-ch-5);
+  --color-stage-parse: var(--color-ch-6);
+  --color-stage-compile: var(--color-warn);
+  --color-stage-run: var(--color-signal);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 10px rgb(0 0 0 / 0.28);
+  --shadow-raised: 0 4px 10px rgb(0 0 0 / 0.32), 0 10px 28px rgb(0 0 0 / 0.36);
+  --shadow-menu: 0 6px 20px rgb(0 0 0 / 0.5);
+}
+
+/* Midnight — deep navy. */
+[data-theme="midnight"] {
+  --color-paper: #12172b;
+  --color-panel: #1a2038;
+  --color-raised: #212843;
+  --color-rule: #2c3454;
+  --color-ink: #e8e9f5;
+  --color-ink-soft: #9ea2c2;
+  --color-ink-muted: #6a6f95;
+  --color-signal: #7f77dd;
+  --color-mutate: #ea6f9e;
+  --color-ok: #5fc490;
+  --color-warn: #e0a552;
+  --color-ch-1: var(--color-signal);
+  --color-ch-2: var(--color-mutate);
+  --color-ch-3: var(--color-ok);
+  --color-ch-4: var(--color-warn);
+  --color-ch-5: #6fa8f0;
+  --color-ch-6: #55c9c2;
+  --color-ch-7: #e0839a;
+  --color-ch-8: #9fc86a;
+  --color-stage-lex: var(--color-ch-5);
+  --color-stage-parse: var(--color-ch-6);
+  --color-stage-compile: var(--color-warn);
+  --color-stage-run: var(--color-signal);
+  --shadow-card: 0 1px 2px rgb(2 4 16 / 0.35), 0 2px 12px rgb(2 4 16 / 0.32);
+  --shadow-raised: 0 4px 12px rgb(2 4 16 / 0.38), 0 12px 30px rgb(2 4 16 / 0.4);
+  --shadow-menu: 0 6px 20px rgb(2 4 16 / 0.55);
+}
+
+/* Sepia — warm dark brown. */
+[data-theme="sepia"] {
+  --color-paper: #23201c;
+  --color-panel: #2b2721;
+  --color-raised: #332e26;
+  --color-rule: #453d32;
+  --color-ink: #f0e6d8;
+  --color-ink-soft: #b8a891;
+  --color-ink-muted: #83745f;
+  --color-signal: #ef9f27;
+  --color-mutate: #ea7d6a;
+  --color-ok: #9cbf5e;
+  --color-warn: #e0b23f;
+  --color-ch-1: var(--color-signal);
+  --color-ch-2: var(--color-mutate);
+  --color-ch-3: var(--color-ok);
+  --color-ch-4: var(--color-warn);
+  --color-ch-5: #c99ce0;
+  --color-ch-6: #5fb8ae;
+  --color-ch-7: #e2896f;
+  --color-ch-8: #b3c268;
+  --color-stage-lex: var(--color-ch-5);
+  --color-stage-parse: var(--color-ch-6);
+  --color-stage-compile: var(--color-warn);
+  --color-stage-run: var(--color-signal);
+  --shadow-card: 0 1px 2px rgb(10 7 3 / 0.35), 0 2px 12px rgb(10 7 3 / 0.3);
+  --shadow-raised: 0 4px 12px rgb(10 7 3 / 0.38), 0 12px 30px rgb(10 7 3 / 0.38);
+  --shadow-menu: 0 6px 20px rgb(10 7 3 / 0.55);
 }

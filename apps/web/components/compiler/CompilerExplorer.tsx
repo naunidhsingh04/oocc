@@ -1,17 +1,14 @@
 "use client";
 
-import { ErrorBoundary, Panel, ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
+import { Button, ErrorBoundary, Panel, ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
 import { useCompilerPlayback } from "@/lib/compiler/usePlayback";
 import { usePipeline } from "@/lib/compiler/usePipeline";
 import type { VmStep } from "@/lib/compiler/types";
-import { AstPane } from "./AstPane";
-import { BytecodePane } from "./BytecodePane";
+import { CompilerRightPane } from "./CompilerRightPane";
 import { PipelineStrip } from "./PipelineStrip";
 import { SourcePane } from "./SourcePane";
-import { TokensPane } from "./TokensPane";
-import { VmPane } from "./VmPane";
 
-const INITIAL_SOURCE = `let x = 1 + 2 * 3;
+const EXAMPLE_SOURCE = `let x = 1 + 2 * 3;
 print x;
 `;
 
@@ -23,15 +20,18 @@ print x;
 const EMPTY_VM_STEPS: readonly VmStep[] = [];
 
 /**
- * /compiler (docs/PRD.md §7) — source, tokens, AST, bytecode, and the VM,
- * all cross-highlighted through `lib/compiler/highlightStore.ts`'s shared
- * astId. Recompiles on a 200ms debounce via a lazily-created Worker
- * (`lib/compiler/client.ts`) wrapping Person B's WASM module.
+ * /compiler (docs/PRD.md §7) — two panes: the source editor (always
+ * visible, left half) and a single tabbed pane (Tokens/AST/Bytecode/Run,
+ * `CompilerRightPane`) on the right, all cross-highlighted through
+ * `lib/compiler/highlightStore.ts`'s shared astId. Recompiles on a 200ms
+ * debounce via a lazily-created Worker (`lib/compiler/client.ts`)
+ * wrapping Person B's WASM module.
  */
 export function CompilerExplorer() {
-  const pipeline = usePipeline(INITIAL_SOURCE);
+  const pipeline = usePipeline(EXAMPLE_SOURCE);
   const vmSteps = pipeline.result?.trace ?? EMPTY_VM_STEPS;
   const playback = useCompilerPlayback(vmSteps);
+  const isEmpty = pipeline.source.trim() === "";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -41,10 +41,10 @@ export function CompilerExplorer() {
         compiling={pipeline.compiling}
         loadStage={pipeline.loadStage}
       />
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 p-3">
         <ResizableSplit id="compiler-explorer-main" orientation="horizontal">
-          <ResizablePane id="compiler-source" defaultSize="30" minSize="15">
-            <Panel title="Source" className="h-full" bodyClassName="min-h-0">
+          <ResizablePane id="compiler-source" defaultSize="50" minSize="30">
+            <Panel title="Source" className="relative h-full" bodyClassName="min-h-0">
               <ErrorBoundary title="Source">
                 <SourcePane
                   source={pipeline.source}
@@ -55,49 +55,34 @@ export function CompilerExplorer() {
                   className="h-full"
                 />
               </ErrorBoundary>
+              {isEmpty ? (
+                <div className="absolute inset-x-0 bottom-0 top-10 flex items-center justify-center bg-panel p-6">
+                  <div className="max-w-sm text-center">
+                    <p className="mb-1 font-body text-[15px] font-semibold text-ink">
+                      This page compiles a small language live as you type
+                    </p>
+                    <p className="mb-4 font-body text-[13px] text-ink-soft">
+                      Watch source turn into tokens, an AST, bytecode, and a running stack VM — every pane
+                      cross-highlights the same piece of code.
+                    </p>
+                    <Button variant="primary" size="sm" onClick={() => pipeline.setSource(EXAMPLE_SOURCE)}>
+                      Load an example
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </Panel>
           </ResizablePane>
           <ResizableHandle />
-          <ResizablePane id="compiler-tokens" defaultSize="18" minSize="10">
-            <Panel title="Tokens" className="h-full" bodyClassName="min-h-0">
-              <ErrorBoundary title="Tokens">
-                <TokensPane tokens={pipeline.result?.tokens ?? []} ast={pipeline.result?.ast ?? null} />
-              </ErrorBoundary>
-            </Panel>
-          </ResizablePane>
-          <ResizableHandle />
-          <ResizablePane id="compiler-ast" defaultSize="22" minSize="12">
-            <Panel title="AST" className="h-full" bodyClassName="min-h-0">
-              <ErrorBoundary title="AST">
-                <AstPane ast={pipeline.result?.ast ?? null} />
-              </ErrorBoundary>
-            </Panel>
-          </ResizablePane>
-          <ResizableHandle />
-          <ResizablePane id="compiler-bytecode" defaultSize="15" minSize="12">
-            <Panel title="Bytecode" className="h-full" bodyClassName="min-h-0">
-              <ErrorBoundary title="Bytecode">
-                <BytecodePane bytecode={pipeline.result?.bytecode ?? null} currentPc={playback.step?.pc} />
-              </ErrorBoundary>
-            </Panel>
-          </ResizablePane>
-          <ResizableHandle />
-          <ResizablePane id="compiler-vm" defaultSize="15" minSize="15">
-            <Panel title="VM" className="h-full" bodyClassName="min-h-0">
-              <ErrorBoundary title="VM">
-                <VmPane
-                  steps={vmSteps}
-                  ticks={pipeline.vmTicks}
-                  currentStep={playback.currentStep}
-                  step={playback.step}
-                  playing={playback.playing}
-                  lastIndex={playback.lastIndex}
-                  jumpTo={playback.jumpTo}
-                  stepBy={playback.stepBy}
-                  togglePlay={playback.togglePlay}
-                />
-              </ErrorBoundary>
-            </Panel>
+          <ResizablePane id="compiler-right" defaultSize="50" minSize="30">
+            <CompilerRightPane
+              tokens={pipeline.result?.tokens ?? []}
+              ast={pipeline.result?.ast ?? null}
+              bytecode={pipeline.result?.bytecode ?? null}
+              vmSteps={vmSteps}
+              vmTicks={pipeline.vmTicks}
+              playback={playback}
+            />
           </ResizablePane>
         </ResizableSplit>
       </div>

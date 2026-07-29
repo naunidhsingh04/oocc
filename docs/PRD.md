@@ -354,47 +354,46 @@ Treat every line of user code as hostile.
 
 The brief says "must not look like a generic AI website." That rules out: purple-to-blue gradients, glassmorphic cards floating on a dark void, a cream background with a big serif headline, orbs, and "✨ Powered by AI" badges.
 
-### 6.1 The concept: a logic analyzer
+### 6.1 The concept: a workshop, not a laboratory
 
-OOCC's subject world is instrumentation — debuggers, oscilloscopes, logic analyzers, film-editing timelines, telemetry consoles. Things that show you a signal over time and let you scrub it. That is literally what the product does. The interface should feel like a well-built measuring instrument: dense, calm, precise, no chrome that isn't carrying information.
+OOCC's subject world is still instrumentation — debuggers, oscilloscopes, logic analyzers, film-editing timelines, telemetry consoles. Things that show you a signal over time and let you scrub it. That's still literally what the product does, and "no chrome that isn't carrying information" is still the rule. What changed (this section, superseding the original single-palette/mono-everywhere direction) is the register: the first version read as a lab bench — correct, but severe enough that it felt like a debug console rather than somewhere a beginner wants to spend an hour learning. The same precision now reads warmer and more considered — a well-organized workshop with good light, not a sterile lab. Concretely: a real theme system instead of one fixed look, a UI typeface everywhere prose/controls appear (monospace earns its place only where it's showing code, tokens, bytecode, or a value), rounded-over geometry and soft shadows instead of square corners and hairlines, and real (but restrained) motion instead of instant, hard state changes.
 
 ### 6.2 Tokens
 
-**Color** — light mode is primary (people learn on projectors and in bright rooms), dark mode is a first-class second.
+**Themes** — five named presets, not a light/dark pair: **Slate** (dark, cool grey-blue), **Paper** (light, warm off-white — the default), **Midnight** (deep navy), **Sepia** (warm dark brown), **Mist** (light, cool grey). Switching is instant, persists in `localStorage`, and a genuinely first-ever visit (nothing stored yet) resolves from the OS's light/dark signal rather than always landing on Paper regardless of preference. Implementation: `packages/ui/src/theme.css` defines one full token set per `[data-theme="<name>"]` block; `apps/web/lib/theme/ThemeProvider.tsx` owns the picker state and an inline no-flash `<script>` (embedded in `app/layout.tsx`'s `<head>`) that stamps the right attribute before first paint. The header's theme picker (`components/ThemeToggle.tsx`, despite the filename) shows a small swatch per preset; the ⌘K palette also offers "Switch to `<preset>`" for all four non-active presets.
+
+Every preset defines the same roles, so components never write a preset-specific variant — they read `bg-panel`, `text-ink`, etc. and repaint for free:
 
 ```
---paper        #EDF0F3   cool grey-blue ground, not cream
---panel        #FFFFFF
---rule         #D2D9E0   1px hairlines, the main structural device
---ink          #0E1116
---ink-soft     #5A6572
---signal       #1B4DE4   cobalt — interactive, current step, focus rings
---mutate       #D6006E   magenta — the value that just changed. Used ONLY for that.
---ok           #0B7A4B
---warn         #B45309
+--paper          page background
+--panel          a panel's own surface
+--raised         a slightly-elevated surface (an active/focused pane)
+--rule           border color — now a secondary device behind spacing/shadow, not the primary one
+--ink            primary text
+--ink-soft       secondary text
+--ink-muted      the most deemphasized text (placeholders, disabled)
+--signal         the accent — interactive, current step, focus rings
+--mutate         the value that just changed. Used ONLY for that.
+--ok / --warn    status colors
 ```
 
-**Channel colors** — the one place with real chroma. Every variable in a trace is assigned a stable channel color the way a logic analyzer assigns colors to probes. Same variable = same color in the editor gutter, the variables panel, the array bars, and the timeline. This is not decoration; it is the mechanism that lets the eye follow one value across four panels.
+**Channel colors** — the one place with real chroma, unchanged in spirit from the original direction: every variable in a trace is assigned a stable channel color the way a logic analyzer assigns colors to probes, reused across the editor gutter, the variables panel, the array bars, and the timeline. Each preset defines its own eight — `ch1`–`ch4` alias `--signal`/`--mutate`/`--ok`/`--warn` (so a channel color is never a fifth, unrelated hue), `ch5`–`ch8` are new per preset (a violet, a teal, a deep rose, an olive, retuned per preset's warmth). See `packages/ui/src/theme.css` for the full five-preset table — the exact hex values aren't reproduced here since they're preset-specific; what's invariant is the eight-distinguishable-hues contract every preset must honor. **Not yet done**: a Phase-6-style automated contrast audit (`>=4.5:1` text, `>=3:1` channel colors) across all five presets — the original single light/dark pair got that treatment; re-run an equivalent sweep before treating all five as launch-ready.
 
-```
-ch1 #1B4DE4  ch2 #D6006E  ch3 #0B7A4B  ch4 #B45309
-ch5 #6D28D9  ch6 #0E7490  ch7 #BE123C  ch8 #4D7C0F
-```
+**Stage colors** — new: `--color-stage-lex`/`-parse`/`-compile`/`-run`, one hue per pipeline stage, carried through the compiler explorer's pipeline strip, its tab labels (Tokens/AST/Bytecode/Run — each tab is literally the stage that produces what it shows), and a thin accent line under whichever pane is visible. Each preset aliases these to existing tokens (lex→`ch5`, parse→`ch6`, compile→`--warn`, run→`--signal`) rather than inventing four more genuinely new hues per preset.
 
 **Type**
 
-- Display: **Chivo** (600/700) — grotesque with engineering flatness. Used at large sizes only, tight tracking (-0.02em).
-- Body/UI: **Public Sans** 400/500.
-- Data & labels: **IBM Plex Mono** 500, uppercase, 11px, +0.06em tracking. All panel headers, step counters, and complexity notation use this.
-- Editor: **JetBrains Mono** 400/14px/1.6.
+- Display: **Chivo** (600/700) — still used, but only for genuine headings (page titles, article titles), tight tracking (-0.02em).
+- Body/UI: **Public Sans**, now 400/500/600/700 (the 600/700 weights are new) — nav, tab labels, panel headers, buttons, and body text all use this. This is the single biggest change from the original direction: monospace no longer stands in for "structure" — a proper UI typeface with real weight contrast does that job instead.
+- **Monospace is reserved for code, tokens, bytecode, and values** — IBM Plex Mono for labels/values that are genuinely data (step counters, disassembly, complexity notation), JetBrains Mono for the editor itself. A panel titled "Variables" is set in Public Sans; the variable values inside it are set in IBM Plex Mono. Getting this split right by call site (not by blanket find-and-replace) is the actual work here — see `packages/ui/src/components/Panel.tsx`, `Table.tsx`, `Chip.tsx`, `Tooltip.tsx`, `CommandPalette.tsx` for the shared-primitive cases, which is most of the app's chrome for free.
 
-Not Inter everywhere. Not a serif display. The mono-for-labels choice is what gives the whole thing its instrument feel.
+Not Inter everywhere. Not a serif display. Both still true.
 
-**Geometry**: 3px radius on controls, 0px on panels. 1px `--rule` borders everywhere; no shadows except a single 0 1px 2px on floating menus. 4px spacing base. Panels butt directly against each other with a shared hairline — like a rack-mounted instrument, not floating cards.
+**Geometry**: 6px radius on controls, 8px on panels — rounded-over edges, not square lab-bench corners. Soft shadows (`--shadow-card` at rest, `--shadow-raised` for an active/focused pane, `--shadow-menu` for floating surfaces) now carry most of a panel's separation from its background; `--rule` hairlines still exist and are still used, but as a secondary device, not the only one — several places that used to butt two panels together on a shared hairline now use spacing instead. 4px spacing base, unchanged. Still no gradients, glassmorphism, floating orbs, cream-and-serif, sparkle badges, or emoji icons — this section's own opening refusals (above) and `packages/ui`'s ESLint rules enforcing them are unchanged by any of this.
 
 ### 6.3 The signature element: the Trace Ribbon
 
-A full-width horizontal ribbon pinned to the bottom of the workspace. Every execution step is a 2px tick. Ticks are colored by event: call (cobalt), return (cobalt 40%), assignment (channel color of the variable changed), comparison (grey), exception (magenta). Loop iterations render as nested brackets above the ticks; a 12-iteration loop reads as 12 visible repeating blocks. Recursion depth renders as vertical offset, so a recursive fibonacci looks like a mountain range.
+A full-width horizontal ribbon pinned to the bottom of the workspace. Every execution step is a 2px tick. Ticks are colored by event: call (`--signal`), return (`--signal` at reduced opacity), assignment (channel color of the variable changed), comparison (grey), exception (`--mutate`) — `--signal`/`--mutate` are cobalt/magenta in Paper specifically, and a different hue in each of the other four presets (§6.2), so "cobalt" and "magenta" were always shorthand for "the signal color" and "the mutate color," not literal colors baked into the ribbon's drawing code. Loop iterations render as nested brackets above the ticks; a 12-iteration loop reads as 12 visible repeating blocks. Recursion depth renders as vertical offset, so a recursive fibonacci looks like a mountain range.
 
 Scrub it and every panel snaps to that step. Hover shows a mini-tooltip with line number and the changed value. Interaction: `←/→` step, `Shift+←/→` jump 10, `Space` play/pause, `,`/`.` speed, `Home/End`, click a bracket to loop-scope playback.
 
@@ -435,6 +434,21 @@ Sentence case. Active verbs. Labels name what the user controls. Errors state wh
 > "Execution stopped at 100,000 steps — line 8's loop never changes `i`. Jump to step 4,120 to see where it stalls."
 
 Not "Oops! Something went wrong ✨".
+
+### 6.7 Motion
+
+Real but restrained, using Framer Motion (`motion` package) throughout — never a looping/pulsing/floating idle animation, and every rule below is binding, not aspirational:
+
+- **150–250ms for everything.** Slower reads as sluggish; this codebase's own reduced-motion collapse (below) is proof a snap-instant version of every one of these transitions is also a legitimate, fully-functional experience — motion is polish, never load-bearing.
+- **Route changes cross-fade with a small upward slide** (`app/template.tsx` — Next's `template.tsx` convention remounts fresh on every navigation, which is also what makes a page's own entrance below replay on navigation and never on an in-page re-render).
+- **A page's own content enters staggered**, header first then its panels, 40ms apart (`packages/ui`'s `Stagger`/`StaggerItem`) — only on first mount.
+- **Tabs slide, don't cut**, and a tab's active-indicator slides between triggers rather than jumping (`packages/ui`'s `TabsList` measures the active trigger's DOM position via `MutationObserver`/`ResizeObserver` so this works whether a given `Tabs` call site is controlled or not; the compiler explorer's own tab bar, `CompilerRightPane.tsx`, is a bespoke version of the same idea, stage-colored per §6.2).
+- **Buttons lift subtly on hover and press down on click**; icon buttons scale down on press. Cards and rows warm their background and strengthen their border on hover rather than just changing color abruptly. Every clickable element responds within 100ms of interaction, never later.
+- **Inputs' borders animate to `--signal` on focus**, not snap to it.
+- **Empty states** get an icon, a warm one-line explanation, and an action button — never a bare box (`packages/ui`'s `EmptyState`; the compiler explorer's own source-pane empty state, `CompilerExplorer.tsx`, additionally offers a one-click example program, since "load an example" is the one action that actually unblocks a beginner here).
+- **Loading states** are skeletons shaped like the real content, with a soft shimmer sweep (`packages/ui`'s `Skeleton`, `@keyframes oocc-shimmer` in `theme.css`) — never a bare spinner, and never for a code-split boundary that resolves near-instantly (that's a different situation than an actual network fetch and doesn't need one).
+- **A success moment gets a brief, accent-colored confirmation that fades over ~2 seconds** — e.g. a passing test-run's summary chip in `ResultPanel.tsx`. **A failure gets a gentle one-time shake plus a warm-toned, actionable message**, never a red wall of text with no next step.
+- **`prefers-reduced-motion: reduce` must fully work**, not just look different — every component above checks Framer's `useReducedMotion()` explicitly (the pre-existing global CSS rule in `theme.css` only catches CSS transitions/animations, not Motion's JS-driven ones) and collapses to an instant state change; every feature still works identically underneath, since motion is never how information is conveyed, only how a state change is noticed.
 
 ---
 

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Value } from "@oocc/contracts";
-import { Button, Chip, IconButton, PlayIcon, PauseIcon, StepBackIcon, StepForwardIcon } from "@oocc/ui";
+import { Button, Chip, IconButton, PlayIcon, PauseIcon, Skeleton, StepBackIcon, StepForwardIcon } from "@oocc/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { usePlayerStore } from "@/lib/player";
@@ -70,7 +70,16 @@ export function EmbeddedTrace({ fixture, caption }: EmbeddedTraceProps) {
     // an article is long enough to hit that cap, so this fixed height
     // matches the loaded card almost exactly rather than guessing low.
     return (
-      <div className="h-[27rem] animate-pulse border border-rule bg-panel" aria-label="Loading embedded trace" />
+      <div
+        className="h-[27rem] space-y-2 rounded-panel border border-rule bg-panel p-2"
+        aria-label="Loading embedded trace"
+      >
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-56 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-8 w-full" />
+      </div>
     );
   }
 

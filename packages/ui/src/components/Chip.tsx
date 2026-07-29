@@ -26,7 +26,7 @@ export function Chip({ className, channel, tone = "neutral", style, children, ..
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-control border px-1.5 py-0.5 font-mono-label text-[11px] uppercase tracking-[0.06em]",
+        "inline-flex items-center gap-1.5 rounded-control border px-1.5 py-0.5 font-mono-label text-[11px]",
         !channel && toneClasses[tone],
         className,
       )}

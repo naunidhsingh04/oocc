@@ -1,4 +1,5 @@
 import { Button, Chip } from "@oocc/ui";
+import { motion, useReducedMotion } from "motion/react";
 
 export interface TestCaseResult {
   input: string;
@@ -54,6 +55,8 @@ function DiffLines({ expected, actual }: { expected: string; actual: string }) {
  * diff right there. This panel is that one click.
  */
 export function ResultPanel({ results, onVisualizeFailure }: ResultPanelProps) {
+  const reduceMotion = useReducedMotion();
+
   if (results.length === 0) {
     return (
       <div className="p-4 text-center font-body text-[13px] text-ink-soft">
@@ -66,17 +69,26 @@ export function ResultPanel({ results, onVisualizeFailure }: ResultPanelProps) {
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto p-3">
-      <div className="flex items-center gap-2">
+      <motion.div
+        className="flex items-center gap-2 rounded-control"
+        initial={reduceMotion ? false : { backgroundColor: allPassed ? "var(--color-ok)" : "transparent" }}
+        animate={{ backgroundColor: "transparent" }}
+        transition={{ duration: reduceMotion ? 0.01 : 2, ease: "easeOut" }}
+      >
         <Chip tone={allPassed ? "ok" : "mutate"}>
           {results.filter((r) => r.passed).length}/{results.length} passed
         </Chip>
-      </div>
+      </motion.div>
       {results.map((result, i) => (
-        <div key={i} className="border border-rule bg-panel">
-          <div className="flex items-center justify-between border-b border-rule bg-paper px-2 py-1">
-            <span className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
-              Case {i + 1}
-            </span>
+        <motion.div
+          key={i}
+          className="border border-rule bg-panel"
+          initial={false}
+          animate={!result.passed && !reduceMotion ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+          transition={{ duration: 0.24, ease: "easeOut" }}
+        >
+          <div className="flex items-center justify-between border-b border-rule bg-paper px-2.5 py-1.5">
+            <span className="font-body text-[13px] font-semibold text-ink-soft">Case {i + 1}</span>
             <Chip tone={result.passed ? "ok" : "mutate"}>{result.passed ? "Passed" : "Failed"}</Chip>
           </div>
           {result.passed ? (
@@ -93,7 +105,7 @@ export function ResultPanel({ results, onVisualizeFailure }: ResultPanelProps) {
               </div>
             </div>
           )}
-        </div>
+        </motion.div>
       ))}
     </div>
   );

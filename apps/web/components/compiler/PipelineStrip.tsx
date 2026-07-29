@@ -1,5 +1,6 @@
 "use client";
 
+import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@oocc/ui";
 import type { CompilerLoadStage } from "@/lib/compiler/client";
 import type { PipelineStage, StageTimings } from "@/lib/compiler/types";
@@ -15,11 +16,11 @@ const LOAD_STAGE_LABELS: Record<CompilerLoadStage, string> = {
 // undefined-variable assignment fails at `SET_GLOBAL` time, not compile
 // time), so "Compile" has no failure state of its own to highlight; only
 // lex/parse/run map to a real `PipelineStage`.
-const STAGES: Array<{ key: keyof StageTimings; label: string; failsAs: PipelineStage | null }> = [
-  { key: "lex", label: "Lex", failsAs: "LexError" },
-  { key: "parse", label: "Parse", failsAs: "ParseError" },
-  { key: "compile", label: "Compile", failsAs: null },
-  { key: "run", label: "Run", failsAs: "RuntimeError" },
+const STAGES: Array<{ key: keyof StageTimings; label: string; failsAs: PipelineStage | null; color: string }> = [
+  { key: "lex", label: "Lex", failsAs: "LexError", color: "var(--color-stage-lex)" },
+  { key: "parse", label: "Parse", failsAs: "ParseError", color: "var(--color-stage-parse)" },
+  { key: "compile", label: "Compile", failsAs: null, color: "var(--color-stage-compile)" },
+  { key: "run", label: "Run", failsAs: "RuntimeError", color: "var(--color-stage-run)" },
 ];
 
 export interface PipelineStripProps {
@@ -38,30 +39,42 @@ function formatMs(ms: number | null): string {
 
 /**
  * The pipeline strip (docs/PRD.md §7): lex/parse/compile/run with
- * per-stage timing, mutate-highlighting whichever stage failed.
+ * per-stage timing. Each stage's dot scales in the instant its timing
+ * lands — "lighting up stage by stage" as a compile actually runs through
+ * lex → parse → compile → run — rather than the whole strip updating at
+ * once when the (non-streaming) worker response arrives.
  */
 export function PipelineStrip({ timings, failedStage, compiling, loadStage }: PipelineStripProps) {
+  const reduceMotion = useReducedMotion();
+
   return (
     <div
-      className="flex h-8 shrink-0 items-center gap-4 border-b border-rule bg-panel px-3"
+      className="flex h-10 shrink-0 items-center gap-5 border-b border-rule bg-panel px-4"
       data-testid="compiler-pipeline-strip"
     >
       {STAGES.map((stage) => {
         const failed = stage.failsAs !== null && failedStage === stage.failsAs;
         const value = timings?.[stage.key] ?? null;
+        const done = value !== null || failed;
         return (
-          <div key={stage.key} className="flex items-center gap-1.5">
+          <div key={stage.key} className="flex items-center gap-2">
+            <motion.span
+              aria-hidden
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: failed ? "var(--color-mutate)" : stage.color }}
+              initial={false}
+              animate={{ scale: done ? 1 : 0, opacity: done ? 1 : 0 }}
+              transition={{ duration: reduceMotion ? 0.01 : 0.2, ease: "easeOut" }}
+            />
             <span
-              className={cn(
-                "font-mono-label text-[11px] uppercase tracking-[0.06em]",
-                failed ? "text-mutate" : "text-ink-soft",
-              )}
+              className={cn("font-body text-[13px] font-semibold transition-colors duration-150")}
+              style={{ color: failed ? "var(--color-mutate)" : "var(--color-ink-soft)" }}
             >
               {stage.label}
             </span>
             <span
               className={cn(
-                "font-mono-label text-[11px] tabular-nums",
+                "font-mono-label text-[12px] tabular-nums transition-colors duration-150",
                 failed ? "text-mutate" : value !== null ? "text-ink" : "text-ink-soft",
               )}
             >
@@ -72,7 +85,7 @@ export function PipelineStrip({ timings, failedStage, compiling, loadStage }: Pi
       })}
       {loadStage ? (
         <span
-          className="ml-auto flex items-center gap-1.5 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft"
+          className="ml-auto flex items-center gap-1.5 font-body text-[13px] font-medium text-ink-soft"
           role="status"
           data-testid="compiler-load-progress"
         >
@@ -80,9 +93,7 @@ export function PipelineStrip({ timings, failedStage, compiling, loadStage }: Pi
           {LOAD_STAGE_LABELS[loadStage]}
         </span>
       ) : compiling ? (
-        <span className="ml-auto font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
-          compiling…
-        </span>
+        <span className="ml-auto font-body text-[13px] font-medium text-ink-soft">Compiling…</span>
       ) : null}
     </div>
   );

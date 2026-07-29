@@ -8,7 +8,7 @@ import { TraceRibbon } from "@/components/ribbon/TraceRibbon";
 import { TutorPanel } from "@/components/tutor/TutorPanel";
 import { usePlaybackClock, usePlayerStore } from "@/lib/player";
 import { useMediaQuery } from "@/lib/useMediaQuery";
-import { ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
+import { ResizableHandle, ResizablePane, ResizableSplit, Stagger, StaggerItem } from "@oocc/ui";
 import { useDefaultLayout } from "react-resizable-panels";
 import { NarrowWorkspace } from "./NarrowWorkspace";
 import { OnboardingTour } from "./OnboardingTour";
@@ -56,9 +56,11 @@ export function Workspace() {
   if (isNarrow) return <NarrowWorkspace />;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <Toolbar />
-      <div className="min-h-0 flex-1">
+    <Stagger className="flex min-h-0 flex-1 flex-col">
+      <StaggerItem>
+        <Toolbar />
+      </StaggerItem>
+      <StaggerItem className="min-h-0 flex-1">
         <ResizableSplit
           id="oocc-workspace-main"
           defaultLayout={defaultLayout}
@@ -98,13 +100,13 @@ export function Workspace() {
             )}
           </ResizablePane>
         </ResizableSplit>
-      </div>
+      </StaggerItem>
       <PlaybackBar />
       <NarrationStrip />
       <TraceRibbon />
       <TutorPanel />
       <StepAnnouncer />
       <OnboardingTour />
-    </div>
+    </Stagger>
   );
 }

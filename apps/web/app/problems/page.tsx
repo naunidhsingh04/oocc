@@ -4,6 +4,7 @@ import { FacetRail } from "@/components/problems/FacetRail";
 import { ProblemTable } from "@/components/problems/ProblemTable";
 import { allTags, applyListState, DEFAULT_LIST_STATE, parseListState, serializeListState } from "@/lib/problems/listState";
 import { PROBLEMS } from "@/lib/problems/data";
+import { Stagger, StaggerItem } from "@oocc/ui";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 
@@ -38,27 +39,27 @@ function ProblemsPageInner() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-rule bg-panel px-3 py-2">
-        <h1 className="font-display text-[15px] font-semibold tracking-[-0.02em] text-ink">Problems</h1>
+    <Stagger className="flex min-h-0 flex-1 flex-col">
+      <StaggerItem className="flex shrink-0 items-center gap-3 border-b border-rule bg-panel px-4 py-3">
+        <h1 className="font-display text-[16px] font-bold tracking-[-0.02em] text-ink">Problems</h1>
         <input
           type="search"
           value={state.q}
           onChange={(e) => updateState({ ...state, q: e.target.value })}
           placeholder="Search title or tag…"
-          className="h-7 w-64 rounded-control border border-rule bg-paper px-2 font-body text-[13px] text-ink outline-none focus:border-signal"
+          className="h-8 w-64 rounded-control border border-rule bg-paper px-2.5 font-body text-[13px] text-ink outline-none transition-colors duration-150 focus:border-signal"
         />
         {(state.difficulty.length > 0 || state.status.length > 0 || state.tags.length > 0 || state.q) && (
           <button
             type="button"
             onClick={() => updateState(DEFAULT_LIST_STATE)}
-            className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft hover:text-signal"
+            className="font-body text-[13px] font-medium text-ink-soft transition-colors duration-150 hover:text-signal"
           >
             Clear filters
           </button>
         )}
-      </div>
-      <div className="flex min-h-0 flex-1">
+      </StaggerItem>
+      <StaggerItem className="flex min-h-0 flex-1">
         <FacetRail
           state={state}
           onChange={updateState}
@@ -71,7 +72,7 @@ function ProblemsPageInner() {
           dir={state.dir}
           onSortChange={(sort, dir) => updateState({ ...state, sort, dir })}
         />
-      </div>
-    </div>
+      </StaggerItem>
+    </Stagger>
   );
 }

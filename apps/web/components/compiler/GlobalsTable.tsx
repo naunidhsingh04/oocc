@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "@oocc/ui";
 import type { StackValue } from "@/lib/compiler/types";
 
@@ -14,8 +15,9 @@ function formatValue(value: StackValue): string {
 
 export function GlobalsTable({ globals }: GlobalsTableProps) {
   const entries = Object.entries(globals);
+  const reduceMotion = useReducedMotion();
   if (entries.length === 0) {
-    return <div className="p-2 font-mono-label text-[11px] text-ink-soft">no globals yet</div>;
+    return <div className="p-3 font-mono-label text-[12px] text-ink-soft">no globals yet</div>;
   }
   return (
     <Table>
@@ -26,14 +28,24 @@ export function GlobalsTable({ globals }: GlobalsTableProps) {
         </TableRow>
       </TableHead>
       <TableBody>
-        {entries.map(([name, value]) => (
-          <TableRow key={name}>
-            <TableCell className="font-mono-label text-[12px]">{name}</TableCell>
-            <TableCell className="text-right font-mono-label text-[12px] tabular-nums">
-              {formatValue(value)}
-            </TableCell>
-          </TableRow>
-        ))}
+        <AnimatePresence initial={false}>
+          {entries.map(([name, value]) => (
+            <motion.tr
+              key={name}
+              layout
+              className="border-b border-rule last:border-b-0"
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduceMotion ? 0.01 : 0.16 }}
+            >
+              <TableCell className="font-mono-label text-[12px]">{name}</TableCell>
+              <TableCell className="text-right font-mono-label text-[12px] tabular-nums">
+                {formatValue(value)}
+              </TableCell>
+            </motion.tr>
+          ))}
+        </AnimatePresence>
       </TableBody>
     </Table>
   );

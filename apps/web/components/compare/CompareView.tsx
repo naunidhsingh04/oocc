@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@oocc/ui";
 import { useEffect, useState } from "react";
 import { fetchFixture, type FixtureBundle, type FixtureName } from "@/lib/fixtures";
 import { CompareWorkspace } from "./CompareWorkspace";
@@ -82,9 +83,9 @@ export function CompareView() {
   if (!a.bundle || !b.bundle) {
     return (
       <div className="flex min-h-0 flex-1 flex-col" aria-label="Loading compare view">
-        <div className="flex min-h-0 flex-1">
-          <div className="min-h-0 flex-1 animate-pulse border-r border-rule bg-panel" />
-          <div className="min-h-0 flex-1 animate-pulse bg-panel" />
+        <div className="flex min-h-0 flex-1 gap-3 p-3">
+          <Skeleton className="min-h-0 flex-1" />
+          <Skeleton className="min-h-0 flex-1" />
         </div>
         <div className="h-9 shrink-0 border-t border-rule bg-panel" />
       </div>

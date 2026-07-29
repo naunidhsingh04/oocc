@@ -1,7 +1,7 @@
 "use client";
 
 import { getStateAt, usePlayerStore } from "@/lib/player";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/lib/theme/ThemeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readRibbonColors } from "./colors";
 import { describeChange } from "./describeChange";

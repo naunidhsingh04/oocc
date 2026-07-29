@@ -118,7 +118,7 @@ export function ProblemTable({ problems, sort, dir, onSortChange }: ProblemTable
             type="button"
             onClick={() => handleHeaderClick(column)}
             className={cn(
-              "flex items-center gap-1 px-1.5 py-1.5 text-left font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft",
+              "flex items-center gap-1 px-1.5 py-2 text-left font-body text-[12px] font-semibold text-ink-soft transition-colors duration-150",
               column.className,
               column.sortable && "cursor-pointer hover:text-ink",
             )}
@@ -157,8 +157,8 @@ export function ProblemTable({ problems, sort, dir, onSortChange }: ProblemTable
                   aria-rowindex={virtualRow.index + 1}
                   data-testid={`problem-row-${problem.slug}`}
                   className={cn(
-                    "absolute left-0 top-0 flex w-full cursor-pointer items-center border-b border-rule px-2 font-body text-[13px] text-ink hover:bg-paper",
-                    isFocused && "bg-paper ring-1 ring-inset ring-signal",
+                    "absolute left-0 top-0 flex w-full cursor-pointer items-center border-b border-rule px-2 font-body text-[13px] text-ink transition-colors duration-150 hover:border-signal/40 hover:bg-raised",
+                    isFocused && "bg-raised ring-1 ring-inset ring-signal",
                   )}
                   style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)` }}
                   onClick={() => {

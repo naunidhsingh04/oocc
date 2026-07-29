@@ -1,5 +1,6 @@
 "use client";
 
+import { Skeleton } from "@oocc/ui";
 import dynamic from "next/dynamic";
 
 // Same reasoning as components/workspace/WorkspaceLoader.tsx: embedded
@@ -16,7 +17,16 @@ import dynamic from "next/dynamic";
 // embedded-trace blocks inside it; out of scope for this pass.
 const ArticleBody = dynamic(() => import("./ArticleBody").then((mod) => mod.ArticleBody), {
   ssr: false,
-  loading: () => <div className="min-h-[100vh] animate-pulse bg-panel" />,
+  loading: () => (
+    <div className="min-h-[100vh] space-y-3">
+      <Skeleton className="h-4 w-3/4" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-5/6" />
+      <Skeleton className="mt-6 h-64 w-full" />
+      <Skeleton className="mt-6 h-4 w-full" />
+      <Skeleton className="h-4 w-2/3" />
+    </div>
+  ),
 });
 
 export function ArticleBodyLoader({ markdown }: { markdown: string }) {

@@ -1,7 +1,8 @@
 "use client";
 
 import type { CommandItem } from "@oocc/ui";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/lib/theme/ThemeProvider";
+import { THEME_IDS, THEME_META } from "@/lib/theme/themes";
 import { useMemo } from "react";
 import { fetchFixture, FIXTURE_NAMES } from "./fixtures";
 import { usePlayerStore } from "./player";
@@ -9,14 +10,14 @@ import { usePlayerStore } from "./player";
 /**
  * The ⌘K command registry (docs/PRD.md §6.4: "Command palette is the
  * primary navigation"). Playback/theme commands act on the player store
- * and next-themes directly — both are external stores, so `onSelect`
+ * and the theme store directly — both are external stores, so `onSelect`
  * reaches into them via `.getState()`/`setTheme` rather than needing props
  * threaded down from wherever the palette happens to be mounted.
  */
 export function useCommandRegistry(): CommandItem[] {
   const playing = usePlayerStore((state) => state.playing);
   const hasTrace = usePlayerStore((state) => state.trace !== null);
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   return useMemo(() => {
     const playback: CommandItem[] = [
@@ -71,14 +72,12 @@ export function useCommandRegistry(): CommandItem[] {
       },
     ];
 
-    const appearance: CommandItem[] = [
-      {
-        id: "theme.toggle",
-        label: resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode",
-        group: "Appearance",
-        onSelect: () => setTheme(resolvedTheme === "dark" ? "light" : "dark"),
-      },
-    ];
+    const appearance: CommandItem[] = THEME_IDS.filter((id) => id !== theme).map((id) => ({
+      id: `theme.${id}`,
+      label: `Switch to ${THEME_META[id].label}`,
+      group: "Appearance",
+      onSelect: () => setTheme(id),
+    }));
 
     // Phase 1 has no run pipeline — fixtures are the only way to load a
     // trace, and the dev-only /api/fixtures route 404s once built for
@@ -97,5 +96,5 @@ export function useCommandRegistry(): CommandItem[] {
           }));
 
     return hasTrace ? [...playback, ...appearance, ...fixtures] : [...appearance, ...fixtures];
-  }, [playing, hasTrace, resolvedTheme, setTheme]);
+  }, [playing, hasTrace, theme, setTheme]);
 }
