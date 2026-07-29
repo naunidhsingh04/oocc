@@ -7,6 +7,185 @@ skipped. See CLAUDE.md's own environment notes for prior sessions' record
 of what this sandbox can and cannot reach (no live Postgres/Redis/SMTP/
 GitHub, no `docker`/`uv` on PATH by default).
 
+The seven-pass detail below (Pass 1 through Pass 6) is the evidence trail.
+This section is the part to actually act on.
+
+---
+
+## Pass 7 — the honest summary
+
+### Launch blockers
+
+**1. The Python sandbox has a known, open, working code-execution escape,
+and no OS-level isolation exists to stop it.**
+`().__class__.__bases__[0].__subclasses__()` reaches arbitrary loaded
+classes without ever calling `__import__` — the import-allowlist (Pass 2)
+cannot and does not stop it; this is proven by a real regression test
+(`test_subclasses_gadget_bypasses_the_import_blocklist`) that exists
+specifically to keep this honest rather than let it be forgotten. gVisor/
+nsjail, the only real fix, is unbuilt. This was true before this audit and
+is still true now — nothing in this session closes it, because nothing
+short of the real sandbox can.
+*Reproduction*: run `test_subclasses_gadget_bypasses_the_import_blocklist`
+in `services/executor/tests/test_sandbox_imports.py` — it passes today
+specifically because the bypass still works.
+*Fix applied*: none possible within this session's scope (needs infra
+work, not a code patch). Mitigated, not fixed: the container-hardening
+flags added to `docker-compose.yml` in Pass 2 reduce blast radius *if* the
+real deployment actually runs with them — unverified, see below.
+
+**2. A plain Python syntax error crashed the executor service outright.**
+The single most common input a real user can type — a missing colon, an
+unclosed bracket — produced an unhandled 500 with no trace, no message,
+nothing playable. Found in Pass 5.
+*Reproduction*: `POST /execute {"source": "def foo(:\n  pass\n"}` against
+the pre-fix code → `500 Internal Server Error`.
+*Fix applied*: `Tracer.run`/`CounterTracer.run` now catch the compile
+step's `SyntaxError` (and subclasses) and return a schema-valid
+`status: "compile_error"` trace. Verified against 5 real syntax-error
+variants and end-to-end through the full `apps/api` pipeline. 4 new
+regression tests. **This is fixed, not just found** — the only launch
+blocker in this list that is.
+
+**3. The executor container ships with none of PRD §5's mandated hardening
+(`--network none` equivalent, `--pids-limit`, `--memory`, `--cap-drop
+ALL`, non-root), and this cannot be verified from this sandbox.**
+*Reproduction*: read `docker-compose.yml` and `services/executor/
+Dockerfile` before this audit — zero of the flags PRD §5 lists were
+present.
+*Fix applied*: added every flag with a direct Compose equivalent except
+`network_mode: none` (deliberately — it would break the api→executor HTTP
+path; see Pass 2 for why). **Not runtime-verified** — `docker` isn't
+installed in this sandbox, so this is a config-correctness change backed
+by reading the Compose Specification and validating the YAML parses as
+intended, never a live `docker compose up` test. Treat as "probably
+correct, unconfirmed" until someone runs it for real.
+
+**4. `status: "memory_limit"` has no reliable enforcement anywhere, and my
+own attempt to add one revealed it's not just missing but actively
+misleading if trusted.**
+*Reproduction*: added `resource.setrlimit(RLIMIT_AS, 256MB)`, then tested
+it directly against a real `[0] * (10**10)` allocation. The process's real
+memory climbed past 3GB and kept growing instead of raising `MemoryError`
+— had to `kill -9` it by hand. Confirmed **not enforced on macOS**
+(a known Darwin/XNU kernel behavior); **not verified on Linux** (the real
+deployment target), because no Linux environment exists in this sandbox.
+*Fix applied*: the code exists and is free when it doesn't help, but do
+not read "a memory limit was added" as "a memory limit works." It doesn't,
+on the one platform this was actually tested on.
+
+### Fixed this session, by pass
+
+- **Pass 1**: 20 real `ruff` violations across 3 Python packages fixed,
+  including one genuine bug (`F821` — `multiprocessing` referenced in a
+  module-level type annotation, only imported locally). Discovered and
+  fixed a significant blind spot: the documented `mypy` command silently
+  never applied each package's own `strict = true` config when run from
+  repo root (CWD-relative config discovery) — every prior "mypy clean"
+  claim in this repo's history was checked under lenient defaults, not
+  real strict mode. Run correctly, found and fixed **82 real type errors**
+  across `apps/api` and `services/executor/tracer.py`; gave
+  `services/cpp-executor` a `[tool.mypy]` section for the first time ever
+  (it had none) and fixed the 7 errors that surfaced. Fixed a real `ENOENT`
+  in `pnpm gen:contracts:check` (assumed a bare `uv` binary on `PATH`,
+  which this sandbox's `pip install uv` doesn't provide) — verified
+  byte-identical generated output before/after, zero contract-shape change.
+- **Pass 2**: the wall-clock limit was hardcoded at 15s (PRD: 5s/10s
+  authed) with a wall-clock breach and a step-count breach sharing one
+  exception type — meaning `status: "timeout"` was **never producible at
+  all**, every time breach was mislabeled `step_limit`. Fixed with a real
+  exception split, request-level override, auth-aware selection, and a
+  cache-correctness guard. Verified live against the real tracer. Added
+  the container-hardening flags (unverified, see blockers). Added a
+  Python-level memory ceiling (verified *not* effective on macOS, see
+  blockers). Wrote the first-ever tests for `changed[]` correctness (PRD
+  explicitly asks for this; nothing existed).
+- **Pass 3**: no fixes — every central-promise check passed as-is.
+- **Pass 4**: closed a real test-coverage gap (`/api/progress` and
+  `/api/progress/review-queue` 401 correctly without auth, live-verified,
+  but nothing asserted it — a regression could have shipped silently).
+- **Pass 5**: the syntax-error crash (blocker #2 above) — the most
+  severe, most certain-to-be-hit bug found in the whole audit.
+- **Pass 6**: no fixes — confirmation only.
+
+### Known broken, not fixed, and why
+
+- **gVisor/nsjail sandbox isolation** — infra work, not a code patch;
+  out of scope for what a single session can close.
+- **Memory limit enforcement** — added, confirmed ineffective on the one
+  platform tested; fixing this for real means the same gVisor/nsjail work
+  as the sandbox escape above, not a better Python-level trick.
+- **Container hardening's actual runtime effect** — config written,
+  cannot be executed in this sandbox (no `docker`).
+- **Digest ~2KB ceiling exceeded by 4 of 12 real fixtures** (up to 28%
+  over) — a soft target overshoot, not a functional break; not fixed
+  because the "fix" (trim digest content further) trades information the
+  LLM nodes actually use against a number PRD itself calls "~2KB," not a
+  hard cap.
+- **Platform demo key** (10 tutor msgs/day/IP) — never built. Requires a
+  real funded, managed Gemini credential and a secret-management decision
+  that isn't mine to make during an audit.
+
+### Unverified — what would close each one
+
+- **`docker compose up`** — needs a machine with Docker installed; this
+  sandbox has none.
+- **Container hardening flags' actual effect** (blocker #3) — same, needs
+  a real `docker compose up` plus a live exec into the running container
+  to confirm `read_only`/`cap_drop`/`user` didn't break startup.
+- **Memory limit on Linux** (blocker #4) — needs a real Linux VM or
+  container to test `RLIMIT_AS` against, matching the actual Fly.io
+  deployment target.
+- **C++ compile timing targets** (cold ≤2s p95, warm ~0ms) — needs the
+  wasi-sdk toolchain, absent from every session's environment so far
+  (gitignored, never fetched here).
+- **Most of the live UI quality floor** (Pass 6) — built and Playwright-
+  verified in a prior session; this audit re-confirmed at the unit-test
+  and static-analysis level but didn't re-run the live browser sweep,
+  given the session-budget constraint flagged mid-audit.
+- **Two-tab / scrubbing-while-executing / panel-resize-to-nothing / full
+  language-selector matrix** (Pass 5) — not reached this session.
+
+### The five things most likely to break in the first week of real use
+
+1. **The sandbox escape gadget, if this ships before gVisor/nsjail.**
+   It's not hypothetical — there's a passing test that proves it works
+   today. Anyone who knows the trick has full code execution.
+2. **Some other input class this audit didn't think to try.** This
+   session found exactly one previously-uncaught exception type
+   (`SyntaxError`) by directly running realistic inputs, not by reading
+   code. That's strong evidence more exist — a session with more budget
+   would keep finding them, not run out of things to find.
+3. **The digest exceeding 2KB on real user code**, not just the 12
+   committed fixtures — 4 of 12 already do, on programs picked to be
+   *representative*, not adversarial. Real user programs will hit this
+   more, not less, with knock-on cost/latency effects on every LLM node.
+4. **The Fly.io deploy configs**, specifically the `user: "65534:65534"`
+   and `read_only: true` flags just added — real risk of breaking
+   container startup on file-permission grounds that only a live
+   `docker compose up`/`fly deploy` would reveal, and neither was possible
+   here.
+5. **Cache staleness from the new auth-aware wall-clock budget** — the
+   cache-skip-on-timeout guard (Pass 2) was reasoned through carefully but
+   only unit-tested, not load-tested under real concurrent traffic from
+   mixed authed/unauthed callers hitting the same source at once.
+
+### The one thing to cut before launch
+
+**Give unauthed and authed users the same 5-second wall-clock budget —
+don't ship the "10s for authed users" extension this audit just added,**
+until gVisor/nsjail exists. It's a literal PRD requirement, and it's now
+correctly implemented, tested, and working. But the honest read of
+everything else in this list is: the Python sandbox has a known, currently
+open, working escape route, and this feature's entire effect is giving
+*more trusted* users *more time* inside that same unsandboxed interpreter.
+That's marginal, arguable upside (10 extra seconds on genuinely slow
+programs) purchased with a real, if small, increase in exposure to the one
+risk this whole audit keeps circling back to. Cut it back to a flat 5s for
+everyone until the sandbox itself is actually closed — then bring the
+distinction back with no further code change needed, since the mechanism
+already exists and already works.
+
 ---
 
 ## Pass 1 — does it build and run
