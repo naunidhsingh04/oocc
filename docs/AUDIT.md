@@ -573,3 +573,28 @@ selector matrix were not exercised this pass. None of these are known or
 suspected to be broken — they're simply unverified, stated as such rather
 than silently assumed fine.
 
+---
+
+## Pass 6 — the quality floor
+
+Most of PRD §9 was built and Playwright-verified earlier in this
+project's history (the "Phase 6 frontend" session, before this audit
+began) — keyboard operability, focus rings, reduced motion, the 375px
+tabbed collapse, the live-region announcer, per-panel error boundaries,
+skeleton sizing. This pass re-confirms with fresh commands rather than
+re-trusting that record, but stops short of re-running the full live
+Playwright sweep given the session-budget constraint — that's the one
+piece carried forward as "previously verified," not re-tested today.
+
+| Item | Result | Evidence |
+|---|---|---|
+| Full `apps/web` test suite | verified | `pnpm --filter @oocc/web test` → **194/194 passed**, including the a11y-adjacent suites (`ErrorBoundary`, `OnboardingTour`, `StepAnnouncer`, `NarrowWorkspace`, `useMediaQuery`) |
+| Contrast: text ≥4.5:1, channel colors ≥3:1 against `--panel` | verified, measured | Recomputed the real WCAG relative-luminance contrast ratio in Node against every token: `ink` 18.91, `ink-soft` 5.93 (both ≥4.5 required), worst channel color 4.99 (≥3 required) — all clear with margin |
+| Route JS budget <200KB | verified | Real `next build` output from Pass 1 (unchanged since — no frontend files touched Passes 2-5): every route under 200KB, largest `/progress` at 181KB |
+| Design refusals: gradients, backdrop-blur, emoji in JSX | verified | Re-ran both greps fresh: zero gradient/blur utility hits, zero emoji hits across all of `apps/web` and `packages/ui` |
+| Keyboard operability, focus rings, reduced motion, 375px collapse, live-region announcer, error boundaries | **previously verified, not re-tested this pass** | Built and Playwright-verified in this project's own prior "Phase 6 frontend" session (screenshots, real keyboard-nav traces, real 375px viewport tests) — not re-run live here for budget reasons. The passing test suite above covers the same code at the unit level as a partial substitute, not a full replacement for the earlier live verification. |
+| "Does this read as a generic AI product" (§6.1 subjective check) | not re-assessed this pass | Skipped — this is a judgment call, not a command-backed check, and the budget constraint means it's better spent on command-backed passes. No new UI was added since the last honest look at this (Phase 6 frontend's own design-critique step, done before this audit). |
+
+No new gaps found. Nothing in this pass contradicts what was already
+built and documented — this is confirmation, not new discovery.
+
