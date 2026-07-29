@@ -7,10 +7,14 @@ import { NarrationStrip } from "@/components/narration/NarrationStrip";
 import { TraceRibbon } from "@/components/ribbon/TraceRibbon";
 import { TutorPanel } from "@/components/tutor/TutorPanel";
 import { usePlaybackClock, usePlayerStore } from "@/lib/player";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
 import { useDefaultLayout } from "react-resizable-panels";
+import { NarrowWorkspace } from "./NarrowWorkspace";
+import { OnboardingTour } from "./OnboardingTour";
 import { PanelGrid } from "./PanelGrid";
 import { PlaybackBar } from "./PlaybackBar";
+import { StepAnnouncer } from "./StepAnnouncer";
 import { Toolbar } from "./Toolbar";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
@@ -19,11 +23,17 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
  * grid in a persisted resizable split, the trace ribbon pinned to the
  * bottom, the tutor docked below that (Phase 3). Phase 2 replaced Phase
  * 1's single hardcoded ArrayPanel with `PanelGrid`; Phase 3 adds the AI
- * surfaces around it without touching that layout engine.
+ * surfaces around it without touching that layout engine. Below the `md`
+ * breakpoint this delegates entirely to `NarrowWorkspace` (docs/PRD.md
+ * §9's "down to 375px" tabbed single column) — both hooks below are owned
+ * here, not duplicated in `NarrowWorkspace`, so the playback clock and
+ * global keyboard shortcuts only ever run once regardless of which layout
+ * renders.
  */
 export function Workspace() {
   usePlaybackClock();
   useKeyboardShortcuts();
+  const isNarrow = useMediaQuery("(max-width: 767px)");
 
   const plan = usePlayerStore((state) => state.plan);
   const analysis = usePlayerStore((state) => state.analysis);
@@ -43,6 +53,8 @@ export function Workspace() {
     storage: typeof window === "undefined" ? { getItem: () => null, setItem: () => {} } : window.localStorage,
   });
 
+  if (isNarrow) return <NarrowWorkspace />;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Toolbar />
@@ -52,11 +64,11 @@ export function Workspace() {
           defaultLayout={defaultLayout}
           onLayoutChanged={onLayoutChanged}
         >
-          <ResizablePane id="editor" defaultSize="55" minSize="20">
+          <ResizablePane id="editor" defaultSize="55" minSize="20" data-tour="editor">
             <CodeEditor className="h-full" />
           </ResizablePane>
           <ResizableHandle />
-          <ResizablePane id="panels" defaultSize="45" minSize="20">
+          <ResizablePane id="panels" defaultSize="45" minSize="20" data-tour="panels">
             {hasComplexity || hasInsights ? (
               <ResizableSplit id="oocc-panels-extras" orientation="vertical">
                 <ResizablePane id="panel-grid" defaultSize="60" minSize="30">
@@ -91,6 +103,8 @@ export function Workspace() {
       <NarrationStrip />
       <TraceRibbon />
       <TutorPanel />
+      <StepAnnouncer />
+      <OnboardingTour />
     </div>
   );
 }

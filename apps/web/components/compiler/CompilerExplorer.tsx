@@ -1,6 +1,6 @@
 "use client";
 
-import { Panel, ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
+import { ErrorBoundary, Panel, ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
 import { useCompilerPlayback } from "@/lib/compiler/usePlayback";
 import { usePipeline } from "@/lib/compiler/usePipeline";
 import type { VmStep } from "@/lib/compiler/types";
@@ -39,53 +39,64 @@ export function CompilerExplorer() {
         timings={pipeline.timings}
         failedStage={pipeline.result?.error?.stage ?? null}
         compiling={pipeline.compiling}
+        loadStage={pipeline.loadStage}
       />
       <div className="min-h-0 flex-1">
         <ResizableSplit id="compiler-explorer-main" orientation="horizontal">
           <ResizablePane id="compiler-source" defaultSize="30" minSize="15">
             <Panel title="Source" className="h-full" bodyClassName="min-h-0">
-              <SourcePane
-                source={pipeline.source}
-                onChange={pipeline.setSource}
-                ast={pipeline.result?.ast ?? null}
-                astIndex={pipeline.astIndex}
-                error={pipeline.result?.error}
-                className="h-full"
-              />
+              <ErrorBoundary title="Source">
+                <SourcePane
+                  source={pipeline.source}
+                  onChange={pipeline.setSource}
+                  ast={pipeline.result?.ast ?? null}
+                  astIndex={pipeline.astIndex}
+                  error={pipeline.result?.error}
+                  className="h-full"
+                />
+              </ErrorBoundary>
             </Panel>
           </ResizablePane>
           <ResizableHandle />
           <ResizablePane id="compiler-tokens" defaultSize="18" minSize="10">
             <Panel title="Tokens" className="h-full" bodyClassName="min-h-0">
-              <TokensPane tokens={pipeline.result?.tokens ?? []} ast={pipeline.result?.ast ?? null} />
+              <ErrorBoundary title="Tokens">
+                <TokensPane tokens={pipeline.result?.tokens ?? []} ast={pipeline.result?.ast ?? null} />
+              </ErrorBoundary>
             </Panel>
           </ResizablePane>
           <ResizableHandle />
           <ResizablePane id="compiler-ast" defaultSize="22" minSize="12">
             <Panel title="AST" className="h-full" bodyClassName="min-h-0">
-              <AstPane ast={pipeline.result?.ast ?? null} />
+              <ErrorBoundary title="AST">
+                <AstPane ast={pipeline.result?.ast ?? null} />
+              </ErrorBoundary>
             </Panel>
           </ResizablePane>
           <ResizableHandle />
           <ResizablePane id="compiler-bytecode" defaultSize="15" minSize="12">
             <Panel title="Bytecode" className="h-full" bodyClassName="min-h-0">
-              <BytecodePane bytecode={pipeline.result?.bytecode ?? null} currentPc={playback.step?.pc} />
+              <ErrorBoundary title="Bytecode">
+                <BytecodePane bytecode={pipeline.result?.bytecode ?? null} currentPc={playback.step?.pc} />
+              </ErrorBoundary>
             </Panel>
           </ResizablePane>
           <ResizableHandle />
           <ResizablePane id="compiler-vm" defaultSize="15" minSize="15">
             <Panel title="VM" className="h-full" bodyClassName="min-h-0">
-              <VmPane
-                steps={vmSteps}
-                ticks={pipeline.vmTicks}
-                currentStep={playback.currentStep}
-                step={playback.step}
-                playing={playback.playing}
-                lastIndex={playback.lastIndex}
-                jumpTo={playback.jumpTo}
-                stepBy={playback.stepBy}
-                togglePlay={playback.togglePlay}
-              />
+              <ErrorBoundary title="VM">
+                <VmPane
+                  steps={vmSteps}
+                  ticks={pipeline.vmTicks}
+                  currentStep={playback.currentStep}
+                  step={playback.step}
+                  playing={playback.playing}
+                  lastIndex={playback.lastIndex}
+                  jumpTo={playback.jumpTo}
+                  stepBy={playback.stepBy}
+                  togglePlay={playback.togglePlay}
+                />
+              </ErrorBoundary>
             </Panel>
           </ResizablePane>
         </ResizableSplit>

@@ -6,7 +6,7 @@ import { orderReviewQueue } from "@/lib/progress/reviewQueue";
 import { buildAttemptedConceptViews, buildConceptViews } from "@/lib/progress/views";
 import { selectWeakConcepts } from "@/lib/progress/weakConcepts";
 import type { ProgressRecord } from "@/lib/progress/types";
-import { Chip } from "@oocc/ui";
+import { Chip, ErrorBoundary } from "@oocc/ui";
 import { useEffect, useState } from "react";
 import { ConceptGraph } from "./ConceptGraph";
 import { ReviewQueue } from "./ReviewQueue";
@@ -70,14 +70,22 @@ export function ProgressDashboard() {
         )}
       </div>
 
-      <ConceptGraph views={conceptViews} />
+      <ErrorBoundary title="Concept graph">
+        <ConceptGraph views={conceptViews} />
+      </ErrorBoundary>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ReviewQueue queue={reviewQueueViews} now={now} />
-        <WeakConcepts concepts={weakConcepts} />
+        <ErrorBoundary title="Review queue">
+          <ReviewQueue queue={reviewQueueViews} now={now} />
+        </ErrorBoundary>
+        <ErrorBoundary title="Weak concepts">
+          <WeakConcepts concepts={weakConcepts} />
+        </ErrorBoundary>
       </div>
 
-      <RunHistory />
+      <ErrorBoundary title="Run history">
+        <RunHistory />
+      </ErrorBoundary>
     </div>
   );
 }

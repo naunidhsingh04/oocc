@@ -1,5 +1,5 @@
-import { WorkspaceLoader } from "@/components/workspace/WorkspaceLoader";
+import { HomeWorkspaceLoader } from "@/components/workspace/WorkspaceLoader";
 
 export default function HomePage() {
-  return <WorkspaceLoader />;
+  return <HomeWorkspaceLoader />;
 }

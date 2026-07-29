@@ -13,14 +13,28 @@
  * inside a classic (non-module) worker, which is exactly what this is.
  */
 
+// Real load-progress milestones (docs/PRD.md §9: "the C++ and explorer
+// WASM modules load lazily with real progress"), not a fabricated
+// percentage bar — this build embeds the compiled wasm binary directly in
+// oocc_compiler.js (no separate .wasm network fetch to report byte
+// progress against), and `importScripts` itself is synchronous with no
+// progress events of its own. These three messages are the genuine
+// lifecycle stages actually available: the glue script's own fetch+parse,
+// then the (synchronous, CPU-bound) WASM compile/instantiate inside
+// `OOCCCompiler()`, then ready.
+self.postMessage({ type: "progress", stage: "loading-script" });
 importScripts("/compiler/oocc_compiler.js");
+self.postMessage({ type: "progress", stage: "initializing-wasm" });
 
 let modulePromise = null;
 
 function getModule() {
   if (!modulePromise) {
     // eslint-disable-next-line no-undef -- OOCCCompiler comes from importScripts above
-    modulePromise = OOCCCompiler();
+    modulePromise = OOCCCompiler().then((mod) => {
+      self.postMessage({ type: "progress", stage: "ready" });
+      return mod;
+    });
   }
   return modulePromise;
 }

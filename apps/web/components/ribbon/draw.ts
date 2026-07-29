@@ -16,6 +16,7 @@ export interface DrawRibbonParams {
   loopScope: LoopScope | null;
   playheadStep: number;
   hoverStep: number | null;
+  pulseStep?: number | null;
   colors: RibbonColors;
 }
 
@@ -44,7 +45,7 @@ function tickFillStyle(bin: TickBin, colors: RibbonColors): string {
 }
 
 export function drawRibbon(ctx: CanvasRenderingContext2D, params: DrawRibbonParams): void {
-  const { width, height, bins, stepCount, maxDepth, loopBrackets, loopScope, playheadStep, hoverStep, colors } =
+  const { width, height, bins, stepCount, maxDepth, loopBrackets, loopScope, playheadStep, hoverStep, pulseStep, colors } =
     params;
 
   ctx.clearRect(0, 0, width, height);
@@ -98,6 +99,19 @@ export function drawRibbon(ctx: CanvasRenderingContext2D, params: DrawRibbonPara
     ctx.moveTo(x, 0);
     ctx.lineTo(x, height);
     ctx.stroke();
+  }
+
+  // A one-shot highlight for a step a tutor/narration/step-chip click just
+  // jumped to (`usePlayerStore.pulseStep`, self-clears after 900ms) — drawn
+  // as a static wide band, not a fading/looping animation, so it already
+  // reads as an instant state change under `prefers-reduced-motion`
+  // without needing a separate reduced-motion branch (docs/PRD.md §9).
+  if (pulseStep !== null && pulseStep !== undefined) {
+    const x = stepToX(pulseStep, stepCount, width);
+    ctx.fillStyle = colors.mutate;
+    ctx.globalAlpha = 0.22;
+    ctx.fillRect(x - 4, 0, 8, height);
+    ctx.globalAlpha = 1;
   }
 
   const playheadX = stepToX(playheadStep, stepCount, width);

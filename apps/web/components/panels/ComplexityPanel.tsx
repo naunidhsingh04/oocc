@@ -22,6 +22,13 @@ const SHAPE_MARKERS: Record<string, string> = {
   all_equal: "var(--color-ch-4)",
 };
 
+const SHAPE_LABELS: Record<string, string> = {
+  random: "random",
+  sorted: "sorted",
+  reverse: "reverse",
+  all_equal: "all equal",
+};
+
 /**
  * The empirically measured curve from the user's own code (docs/PRD.md
  * §4.3) — a scatter of every (n, step_count) sample the executor actually
@@ -76,6 +83,20 @@ export function ComplexityPanel() {
             />
           ))}
         </svg>
+        {/* docs/PRD.md §9: color alone can't distinguish the four input
+            shapes — a text legend pairs each swatch with its name. */}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono-label text-[10px] uppercase tracking-[0.04em] text-ink-soft">
+          {Object.entries(SHAPE_LABELS).map(([shape, label]) => (
+            <span key={shape} className="flex items-center gap-1">
+              <span
+                aria-hidden="true"
+                className="inline-block size-2 rounded-full"
+                style={{ backgroundColor: SHAPE_MARKERS[shape] }}
+              />
+              {label}
+            </span>
+          ))}
+        </div>
         <div className="font-mono-label text-[12px] text-ink">
           Best fit: <span className="font-medium">{modelLabel(report.best_fit)}</span> (R²={" "}
           {rSquared.toFixed(4)})

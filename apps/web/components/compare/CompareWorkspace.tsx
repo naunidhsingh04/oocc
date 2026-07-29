@@ -1,6 +1,6 @@
 "use client";
 
-import { ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
+import { ErrorBoundary, ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
 import { useDefaultLayout } from "react-resizable-panels";
 import type { FixtureBundle, FixtureName } from "@/lib/fixtures";
 import { useComparePlayback } from "@/lib/compare/useComparePlayback";
@@ -69,31 +69,35 @@ export function CompareWorkspace({
       <div className="min-h-0 flex-1">
         <ResizableSplit id="oocc-compare-main" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
           <ResizablePane id="run-a" defaultSize="50" minSize="25">
-            <CompareRunPanel
-              id="compare-fixture-a"
-              label={`Run A · ${bundleA.name}`}
-              source={bundleA.source}
-              fixtureName={bundleA.name}
-              onFixtureChange={onFixtureChangeA}
-              loading={loadingA}
-              side={sideA}
-              pos={posA}
-              onScrub={scrubA}
-            />
+            <ErrorBoundary title="Run A">
+              <CompareRunPanel
+                id="compare-fixture-a"
+                label={`Run A · ${bundleA.name}`}
+                source={bundleA.source}
+                fixtureName={bundleA.name}
+                onFixtureChange={onFixtureChangeA}
+                loading={loadingA}
+                side={sideA}
+                pos={posA}
+                onScrub={scrubA}
+              />
+            </ErrorBoundary>
           </ResizablePane>
           <ResizableHandle />
           <ResizablePane id="run-b" defaultSize="50" minSize="25">
-            <CompareRunPanel
-              id="compare-fixture-b"
-              label={`Run B · ${bundleB.name}`}
-              source={bundleB.source}
-              fixtureName={bundleB.name}
-              onFixtureChange={onFixtureChangeB}
-              loading={loadingB}
-              side={sideB}
-              pos={posB}
-              onScrub={scrubB}
-            />
+            <ErrorBoundary title="Run B">
+              <CompareRunPanel
+                id="compare-fixture-b"
+                label={`Run B · ${bundleB.name}`}
+                source={bundleB.source}
+                fixtureName={bundleB.name}
+                onFixtureChange={onFixtureChangeB}
+                loading={loadingB}
+                side={sideB}
+                pos={posB}
+                onScrub={scrubB}
+              />
+            </ErrorBoundary>
           </ResizablePane>
         </ResizableSplit>
       </div>

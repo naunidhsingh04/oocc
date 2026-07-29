@@ -47,3 +47,4 @@ export {
   type ToastTone,
 } from "./components/Toast";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState";
+export { ErrorBoundary, type ErrorBoundaryProps } from "./components/ErrorBoundary";

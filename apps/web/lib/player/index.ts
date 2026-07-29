@@ -1,3 +1,4 @@
+export { describeStepForAnnouncement } from "./announceStep";
 export { CHANNEL_COUNT, buildChannelAssignment, channelColorVar, type ChannelAssignment } from "./channels";
 export { clampStep, getStateAt, indexForStepRef, iterateResolvedSteps, type ResolvedStep } from "./getStateAt";
 export { computeLoopBrackets, type LoopBracket } from "./loops";

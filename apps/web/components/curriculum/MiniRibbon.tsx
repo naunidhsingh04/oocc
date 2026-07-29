@@ -89,17 +89,51 @@ export function MiniRibbon({ ticks, currentStep, onScrub }: MiniRibbonProps) {
     [stepCount, onScrub],
   );
 
+  // Not covered by the workspace's global keyboard shortcuts (those act on
+  // `usePlayerStore`; an embedded article trace is local-state-driven, per
+  // this component's own docstring) — arrow keys need their own handler.
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLCanvasElement>) => {
+      if (stepCount === 0) return;
+      const last = stepCount - 1;
+      switch (event.key) {
+        case "ArrowRight":
+          event.preventDefault();
+          onScrub(Math.min(last, currentStep + (event.shiftKey ? 10 : 1)));
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          onScrub(Math.max(0, currentStep - (event.shiftKey ? 10 : 1)));
+          break;
+        case "Home":
+          event.preventDefault();
+          onScrub(0);
+          break;
+        case "End":
+          event.preventDefault();
+          onScrub(last);
+          break;
+        default:
+          break;
+      }
+    },
+    [stepCount, currentStep, onScrub],
+  );
+
   return (
     <div ref={containerRef} className="w-full" style={{ height: MINI_RIBBON_HEIGHT }}>
       <canvas
         ref={canvasRef}
+        tabIndex={0}
         className="block cursor-pointer"
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         role="slider"
-        aria-label="Embedded trace ribbon"
+        aria-label="Embedded trace ribbon — arrow keys step, shift-arrow jumps 10, Home/End jump to the ends"
         aria-valuemin={0}
         aria-valuemax={Math.max(0, stepCount - 1)}
         aria-valuenow={currentStep}
+        aria-valuetext={`Step ${currentStep} of ${Math.max(0, stepCount - 1)}`}
       />
     </div>
   );

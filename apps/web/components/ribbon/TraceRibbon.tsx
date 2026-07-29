@@ -29,6 +29,7 @@ export function TraceRibbon() {
   const loopBrackets = usePlayerStore((state) => state.loopBrackets);
   const loopScope = usePlayerStore((state) => state.loopScope);
   const currentStep = usePlayerStore((state) => state.currentStep);
+  const pulseStep = usePlayerStore((state) => state.pulseStep);
   const jumpTo = usePlayerStore((state) => state.jumpTo);
   const setLoopScope = usePlayerStore((state) => state.setLoopScope);
 
@@ -75,11 +76,24 @@ export function TraceRibbon() {
       loopScope,
       playheadStep: currentStep,
       hoverStep,
+      pulseStep,
       colors,
     });
     // resolvedTheme isn't read directly but its change is what makes the
     // CSS custom properties resolve to different values on the next paint.
-  }, [bins, stepCount, maxDepth, loopBrackets, loopScope, currentStep, hoverStep, containerWidth, height, resolvedTheme]);
+  }, [
+    bins,
+    stepCount,
+    maxDepth,
+    loopBrackets,
+    loopScope,
+    currentStep,
+    hoverStep,
+    pulseStep,
+    containerWidth,
+    height,
+    resolvedTheme,
+  ]);
 
   const handlePointerMove = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -123,20 +137,23 @@ export function TraceRibbon() {
   return (
     <div
       ref={containerRef}
+      data-tour="ribbon"
       className="relative w-full shrink-0 border-t border-rule bg-paper"
       style={{ height }}
     >
       <canvas
         ref={canvasRef}
+        tabIndex={0}
         className="block cursor-pointer"
         onPointerMove={handlePointerMove}
         onPointerLeave={handlePointerLeave}
         onClick={handleClick}
         role="slider"
-        aria-label="Trace ribbon"
+        aria-label="Trace ribbon — arrow keys step, shift-arrow jumps 10, Home/End jump to the ends"
         aria-valuemin={0}
         aria-valuemax={Math.max(0, stepCount - 1)}
         aria-valuenow={currentStep}
+        aria-valuetext={`Step ${currentStep} of ${Math.max(0, stepCount - 1)}`}
       />
       {hoverInfo ? (
         <div

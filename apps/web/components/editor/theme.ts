@@ -54,7 +54,7 @@ export const ooccEditorTheme: Extension = EditorView.theme(
       backgroundColor: "var(--color-mutate)",
     },
     ".cm-oocc-channel-dots-gutter": {
-      minWidth: "10px",
+      minWidth: "12px",
       paddingRight: "2px",
     },
     ".cm-oocc-channel-dots": {
@@ -64,11 +64,38 @@ export const ooccEditorTheme: Extension = EditorView.theme(
       height: "100%",
       paddingLeft: "2px",
     },
+    // docs/PRD.md §9: color alone can't distinguish one channel dot from
+    // another — each of the 8 channels also gets a distinct shape (circle/
+    // square/triangle/diamond, filled for channels 1-4 and an outline ring
+    // for 5-8) so the color-coding always has a shape fallback.
     ".cm-oocc-channel-dot": {
       display: "inline-block",
-      width: "5px",
-      height: "5px",
+      width: "6px",
+      height: "6px",
+    },
+    ".cm-oocc-channel-dot--1": { borderRadius: "50%" },
+    ".cm-oocc-channel-dot--2": { borderRadius: "1px" },
+    ".cm-oocc-channel-dot--3": { clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)" },
+    ".cm-oocc-channel-dot--4": { clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)" },
+    ".cm-oocc-channel-dot--5": {
       borderRadius: "50%",
+      backgroundColor: "transparent !important",
+      border: "1.5px solid",
+    },
+    ".cm-oocc-channel-dot--6": {
+      borderRadius: "1px",
+      backgroundColor: "transparent !important",
+      border: "1.5px solid",
+    },
+    ".cm-oocc-channel-dot--7": {
+      clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
+      backgroundColor: "transparent !important",
+      border: "1.5px solid",
+    },
+    ".cm-oocc-channel-dot--8": {
+      clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+      backgroundColor: "transparent !important",
+      border: "1.5px solid",
     },
     ".cm-oocc-insight-gutter": {
       width: "10px",

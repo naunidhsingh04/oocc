@@ -1088,6 +1088,66 @@ behind an `OOCC_TRACE` CMake option. Things later phases must respect:
   always resolve the same way PowerShell does — prefer PowerShell for
   actually *running* a built native/WASM artifact in this environment.
 
+## Phase 5 frontend: compare view, progress dashboard, compiler explorer UI (done)
+
+Backfilled into this file after the fact — this phase shipped without its
+own CLAUDE.md update, discovered and reconstructed by reading the actual
+code (`apps/web/components/compare/`, `apps/web/components/progress/`,
+`apps/web/components/compiler/`, `apps/web/lib/compiler/`,
+`apps/web/lib/progress/`) rather than from a session transcript. Treat the
+specifics below as verified-against-the-code, not as reported gotchas from
+whoever built it — there may be real lessons from that session that never
+made it into writing anywhere.
+
+- **`/compare`**: two independent trace playheads side by side
+  (`CompareWorkspace.tsx`, `CompareRunPanel.tsx`), synchronized by
+  `lib/compare/useComparePlayback.ts` — a local-state hook, not
+  `usePlayerStore`, following the exact precedent Phase 4 frontend's
+  `useEmbeddedTrace` already set (a page-wide singleton store can't back
+  two simultaneous independent playheads). `components/editor/CodeEditor.tsx`
+  was split into a thin `usePlayerStore`-reading wrapper around a new
+  props-driven `CodeEditorView.tsx` specifically so Compare's second
+  playhead can mount its own `CodeEditorView` fed by local state — the same
+  "split the store-reading wrapper from the props-driven view" shape this
+  codebase already uses for the ribbon (`TraceRibbon` vs `MiniRibbon`/
+  `CompilerRibbon`, both reusing `drawRibbon`/`computeTickBins`/
+  `readRibbonColors`).
+- **`/progress`**: `ProgressDashboard.tsx` assembles a concept graph, review
+  queue, weak-concepts list, and run history from the real, session-gated
+  Phase 5 backend (`GET /api/progress`, `GET /api/progress/review-queue`).
+  `lib/progress/api.ts`'s two fetchers return `null` (not `[]`) on any
+  non-2xx status or network failure — `null` means "fall back to demo
+  data" (`lib/progress/demoData.ts`), a real empty `[]` means "signed in,
+  genuinely zero rows yet," and the dashboard renders those two states
+  differently (a `Chip tone="warn"` "Demo data — sign in to track your own
+  progress" vs `Chip tone="ok"` "Live — your progress"). There's no login
+  UI in this frontend, so in this dev sandbox every call 401s/network-fails
+  and the dashboard always shows demo data — `credentials: "include"` is
+  already correct so a real session cookie works the moment a login flow
+  exists, without touching this file again.
+- **`/compiler`**: `CompilerExplorer.tsx` — five panes (Source/Tokens/AST/
+  Bytecode/VM) around Phase 5 backend Track B's teaching-language compiler,
+  compiled to WASM and run in a Worker (`public/compiler/compilerWorker.js`,
+  loaded via `importScripts` from a static asset, not bundled — the same
+  "Next's bundler has no first-class story for a hand-built Emscripten
+  artifact" reasoning `services/cpp-executor` already established for its
+  own WASM). `lib/compiler/client.ts`'s `compileInWorker` lazily creates
+  the worker on the first compile; `lib/compiler/usePipeline.ts` debounces
+  recompiles 200ms after each keystroke. Cross-highlighting (hovering an
+  opcode lights up its AST node, token range, and source characters, and
+  every direction works) is one shared store (`lib/compiler/highlightStore.ts`'s
+  `hoverAstId`/`selectedAstId`) that every pane derives its own highlight
+  from by `astId` equality — no pane talks to another directly, which is
+  what makes adding a sixth pane free. `EMPTY_VM_STEPS` in
+  `CompilerExplorer.tsx` is the same fresh-array-literal-selector fix
+  Phase 3 frontend's `EMPTY_INSIGHTS` already established, applied here to
+  `usePlayback`'s `steps` input.
+- **`motion` (Framer Motion's current package name)** is a real dependency
+  (`components/compiler/StackView.tsx`) — found to be declared in
+  `package.json` but missing from `node_modules` entirely during Phase 6
+  frontend's bug hunt (see below); this was a real, if latent, bug from
+  this phase, fixed by `pnpm install`, not a Phase 6 change in behavior.
+
 ## Phase 6 backend, part 1: wire optimisation, security review, operations (done)
 
 Three tracks: §3.4's keyframe+patch wire format shipped, PRD §5's
@@ -1249,6 +1309,170 @@ not re-break.
   calls the top follow-up. Postgres/Redis are managed services referenced
   by env var, never a same-app sidecar; traces go to R2/S3 via the
   already-existing `S3TraceStore`.
+
+## Phase 6 frontend: accessibility, performance, responsive, landing, onboarding, design critique (done)
+
+`apps/web` now passes PRD §9's quality floor item by item. Things later
+sessions must respect:
+
+- **The landing page (`/`) is a real, already-playing workspace, not a
+  screenshot or a headline.** `components/workspace/LandingWorkspace.tsx`
+  auto-loads the `bubble_sort` fixture and calls `play()` the moment it
+  mounts, and loops back to the start ~1.2s after reaching the end — unless
+  the user has actually touched the page (pointerdown/keydown), tracked via
+  a ref, not state, so it doesn't retrigger the autoplay effect. **Real bug
+  found and fixed here**: the first implementation used a `cancelled`
+  closure flag plus an `attemptedAutoload` ref to guard against double-
+  fetching — React 19 Strict Mode's dev-only mount→cleanup→mount double-
+  invoke set `cancelled = true` on the *first* invocation's fetch before it
+  resolved, and the *second* invocation's own `attemptedAutoload.current`
+  check (already `true` from the first) skipped it entirely — net result,
+  autoplay silently never started, caught only by an actual Playwright
+  screenshot showing "step 0/0," not by code review. Fixed by dropping both
+  guards: the effect only mutates the external `usePlayerStore`, not React
+  state, so there's no unmounted-setState risk the `cancelled` flag was
+  ever protecting against — a resolve-time re-check
+  (`usePlayerStore.getState().trace !== null`) is sufficient and correct
+  under Strict Mode.
+- **Error boundaries are per-panel, not just per-route.** `packages/ui`'s
+  new `ErrorBoundary` (class component — `getDerivedStateFromError`/
+  `componentDidCatch`, no hook equivalent exists) wraps every panel
+  individually: `PanelFrame.tsx` (covers the whole main-workspace grid,
+  both normal and maximized layouts, in one edit), both sides of
+  `CompareWorkspace.tsx`, all five panes of `CompilerExplorer.tsx`, and all
+  four sections of `ProgressDashboard.tsx` — one bad panel shows a
+  contained "retry" fallback instead of taking the session down. A new
+  `app/error.tsx` (Next's App Router route-level convention, a client
+  component) is the last-resort net beneath all of those for anything that
+  throws outside every panel boundary.
+- **The current step announces through a polite live region.**
+  `lib/player/announceStep.ts`'s `describeStepForAnnouncement` produces
+  "Step 412, line 17, mid changed to 4" — `stepNumber` is deliberately the
+  array-*position* convention `PlaybackBar.tsx`'s visible counter already
+  uses, not `step.i`, so a sighted-and-hearing user cross-checking what
+  they hear against what's on screen never sees two different numbers (the
+  same distinction `lib/player/ticks.ts` had to get right for a truncated
+  trace back in Phase 2). `components/workspace/StepAnnouncer.tsx` renders
+  it into an `.sr-only` `role="status" aria-live="polite"` region,
+  debounced 300ms so higher playback speeds don't spam a screen reader
+  with dozens of announcements a second — it settles on whatever step the
+  user is actually looking at once playback slows or pauses. Only mounted
+  in the main `Workspace`/`NarrowWorkspace`, not Compare/Compiler, a
+  deliberate scope decision, not an oversight.
+- **The ribbon (and its `MiniRibbon`/`CompilerRibbon` siblings) are
+  genuinely keyboard-operable now**, not just visually a slider: all three
+  gained `tabIndex={0}` and a real `aria-valuetext`. The main workspace's
+  `TraceRibbon` doesn't need its own key handler — `useKeyboardShortcuts.ts`
+  already attaches arrow/Home/End/Space to `window`, which fires regardless
+  of which element has focus (as long as it's not a text input) — but
+  `MiniRibbon`/`CompilerRibbon` are local-state-driven (no global store to
+  hook into), so each gained its own `onKeyDown` (arrow steps by 1,
+  shift-arrow by 10, Home/End to the ends), mirroring the global shortcuts'
+  own semantics exactly.
+- **Contrast was measured, not assumed, and it already passed.** A
+  standalone WCAG relative-luminance script against every `--color-ch-N`/
+  `--color-ink*` value in both themes confirmed every value already clears
+  the §9 floor (≥4.5:1 text, ≥3:1 channel colors, both against `--panel`) —
+  `theme.css`'s own comment claiming this was verified for real, not just
+  asserted.
+- **A dead feature got wired up while auditing reduced-motion, not
+  because it was in scope**: `usePlayerStore.pulseStep` (set by
+  `jumpToStepRef`, self-clearing after 900ms, meant to flash the ribbon
+  when a tutor/narration/step-chip click scrubs there — see Phase 3
+  frontend's own docstring for `jumpToStepRef`) was never actually read by
+  `TraceRibbon`/`draw.ts` — the store tracked it, a test asserted the store
+  value, and nothing ever drew it. Fixed by threading `pulseStep` through
+  `DrawRibbonParams` into a static highlighted band (no animation loop, so
+  it already reads as an instant state change under
+  `prefers-reduced-motion` with no separate branch needed).
+- **Two real channel-color-only gaps found and fixed**: `ComplexityPanel`'s
+  scatter plot colored its four input-shape categories (random/sorted/
+  reverse/all-equal) with no text legend and identical circle markers —
+  fixed with a small swatch+label legend row. The editor gutter's
+  channel dots (`channelDotsGutter.ts`) were plain colored circles with the
+  variable name only in a hover-only `title` — fixed with 8 distinct
+  shapes (circle/square/triangle/diamond, filled for channels 1-4, an
+  outline ring for 5-8 via `theme.ts`'s `.cm-oocc-channel-dot--N` rules),
+  so the color-coding always has a shape fallback even before hovering.
+- **Responsive collapse happens in `NarrowWorkspace.tsx`, a genuinely
+  different component below the `md` (767px) breakpoint** (`Workspace.tsx`'s
+  new `useMediaQuery` check), not a CSS reflow of the same one — the
+  desktop layout's `ResizableSplit`/docked-tutor-drawer chrome doesn't
+  make sense stacked at phone width. Three tabs (Code/Visual/Tutor) around
+  the same lower-level pieces (`CodeEditor`, `PanelGrid`, `ComplexityPanel`,
+  `InsightsPanel`, a new `TutorTranscript` extracted from `TutorPanel` so
+  the transcript+composer body can mount without the docked drawer's own
+  collapse/resize chrome around it a second time); `PlaybackBar`/
+  `NarrationStrip`/`TraceRibbon` stay pinned below the tabs regardless of
+  which tab is active. `PanelGrid` gained a `forceStacked` prop (used only
+  here) — a `"primary+stack"` plan's side-by-side `orientation="horizontal"`
+  split squeezes both panes below their `minSize` in a ~340px-wide tab,
+  overlapping their own headers; `forceStacked` always uses the flat
+  vertical `PanelStack` instead, the same one the `"meta"`-layout fallback
+  already used. **A real, pre-existing bug found via a live 375px
+  screenshot, not code review, and unrelated to width**: `ArrayPanel`'s
+  Bars/Cells toggle lived in `Panel`'s `actions` slot (the title bar's own
+  right edge) — `PanelFrame`'s floating retype/maximize/remove controls
+  are absolutely positioned over that exact same corner, so the two
+  collided at *every* width, desktop included, just not previously
+  noticed. Fixed by moving the toggle to its own row below the title bar.
+- **No layout shift on trace load — skeletons reserve real space.**
+  `EmbeddedTrace`'s loading skeleton was a flat `h-40` (160px) against a
+  loaded card that's reliably ~432px (chrome + a code block capped at
+  `max-h-72`, and every real fixture is long enough to hit that cap) —
+  fixed to `h-[27rem]` to match. `ArticleBodyLoader`'s skeleton (the whole
+  article body, prose included) can't be sized precisely without parsing
+  the markdown first, so it's a deliberately generous `min-h-[100vh]` floor
+  rather than a precise match — documented as a real, known limitation, not
+  solved outright. Every other dynamic-loader skeleton in the app
+  (`WorkspaceLoader`, `ProblemWorkspaceLoader`, `CompareLoader`,
+  `CompilerExplorerLoader`) already used `min-h-0 flex-1` inside a
+  definite-height flex ancestor, which has no CLS to begin with.
+- **The compiler-explorer WASM module now reports real load progress, not
+  a fabricated percentage.** This build embeds the compiled wasm binary
+  directly inside `oocc_compiler.js` (no separate `.wasm` file to report
+  byte-fetch progress against), and `importScripts` itself has no progress
+  events — so `public/compiler/compilerWorker.js` posts three genuine
+  lifecycle milestones (`loading-script` → `initializing-wasm` → `ready`)
+  instead. `lib/compiler/client.ts`'s `onCompilerLoadStage` routes these
+  (a message with no `id`) separately from per-compile responses (a
+  message with an `id`); `PipelineStrip.tsx` shows the stage label in place
+  of the plain "compiling…" text only while `loadStage` is non-null, which
+  is only ever true once per session (the module stays loaded after).
+- **A four-step onboarding tour runs inside the real workspace on
+  whatever fixture is already loaded** — `components/workspace/
+  OnboardingTour.tsx` measures the actual mounted DOM via
+  `[data-tour="editor"|"ribbon"|"panels"|"tutor"]` markers in
+  `Workspace.tsx` and positions a callout + a highlight outline against
+  the real `getBoundingClientRect()`, not a canned screenshot or a fixed
+  mock layout. `lib/onboarding/store.ts`'s `hasTourBeenSeen`/`markTourSeen`
+  (a plain localStorage flag) is the only persistence — skipping or
+  finishing both mark it seen immediately, and it only ever starts once a
+  real trace (`usePlayerStore.trace`) is loaded. Verified live end to end
+  via Playwright: all four steps show correct spotlighted targets and real
+  step counts, "Done" closes it and sets the flag, and a page reload after
+  that never shows it again.
+- **Final design critique**: a repo-wide grep for gradient utilities,
+  `backdrop-blur`, and real emoji characters in JSX confirmed zero hits
+  across `apps/web` and `packages/ui` (already clean before this phase,
+  reconfirmed after every file this phase added). The one thing removed
+  for "not carrying information": `/styleguide` — a real, still-reachable
+  page (an internal design-token/component reference), but its promotion
+  to the persistent top-level nav next to Problems/Curriculum/Progress/
+  Compiler was meta-tooling noise for an actual learner, not signal; the
+  route itself wasn't deleted.
+- **A whole-project bug hunt after all of the above surfaced two
+  unrelated, real bugs, both fixed**: the `motion` package (used by
+  `StackView.tsx`, Phase 5 frontend) was declared in `package.json` but
+  missing from `node_modules` entirely — a stale install, fixed by `pnpm
+  install`, unrelated to any Phase 6 change. And `next build`, run once
+  during this phase's performance audit, silently corrupted the dev
+  server's shared `.next/` directory (`next dev` and `next build` don't
+  share build output formats) — surfaced as static-chunk 404s and a blank
+  page; fixed by clearing `.next/` and restarting `next dev`. Neither is a
+  latent product bug; both are documented here because they're exactly the
+  kind of "looks like everything's broken" false alarm a future session
+  could otherwise chase for an hour.
 
 ## Tests ship with the code they test
 

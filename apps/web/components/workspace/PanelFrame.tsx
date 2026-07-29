@@ -1,7 +1,7 @@
 "use client";
 
 import type { Panel as PlanPanelNode, PanelType } from "@oocc/contracts";
-import { CloseIcon, IconButton } from "@oocc/ui";
+import { CloseIcon, ErrorBoundary, IconButton } from "@oocc/ui";
 import { PANEL_LABELS, resolvePanelComponent } from "./panelRegistry";
 
 interface PanelFrameProps {
@@ -53,8 +53,10 @@ export function PanelFrame({ panel, availableTypes, maximized, onRemove, onRetyp
           <CloseIcon />
         </IconButton>
       </div>
-      {/* eslint-disable-next-line react-hooks/static-components -- see the resolvePanelComponent call above */}
-      <Component panel={panel} />
+      <ErrorBoundary title={PANEL_LABELS[panel.type]}>
+        {/* eslint-disable-next-line react-hooks/static-components -- see the resolvePanelComponent call above */}
+        <Component panel={panel} />
+      </ErrorBoundary>
     </div>
   );
 }

@@ -1,7 +1,14 @@
 "use client";
 
 import { cn } from "@oocc/ui";
+import type { CompilerLoadStage } from "@/lib/compiler/client";
 import type { PipelineStage, StageTimings } from "@/lib/compiler/types";
+
+const LOAD_STAGE_LABELS: Record<CompilerLoadStage, string> = {
+  "loading-script": "loading compiler…",
+  "initializing-wasm": "initializing wasm…",
+  ready: "ready",
+};
 
 // `compiler.cpp` never throws an `OoccError` in this language (verified
 // against its source — every semantic check surfaces at runtime, e.g. an
@@ -19,6 +26,8 @@ export interface PipelineStripProps {
   timings: StageTimings | null;
   failedStage: PipelineStage | null;
   compiling: boolean;
+  /** Real WASM-load progress on the very first compile (docs/PRD.md §9) — null once loaded. */
+  loadStage?: CompilerLoadStage | null;
 }
 
 function formatMs(ms: number | null): string {
@@ -31,7 +40,7 @@ function formatMs(ms: number | null): string {
  * The pipeline strip (docs/PRD.md §7): lex/parse/compile/run with
  * per-stage timing, mutate-highlighting whichever stage failed.
  */
-export function PipelineStrip({ timings, failedStage, compiling }: PipelineStripProps) {
+export function PipelineStrip({ timings, failedStage, compiling, loadStage }: PipelineStripProps) {
   return (
     <div
       className="flex h-8 shrink-0 items-center gap-4 border-b border-rule bg-panel px-3"
@@ -61,7 +70,16 @@ export function PipelineStrip({ timings, failedStage, compiling }: PipelineStrip
           </div>
         );
       })}
-      {compiling ? (
+      {loadStage ? (
+        <span
+          className="ml-auto flex items-center gap-1.5 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft"
+          role="status"
+          data-testid="compiler-load-progress"
+        >
+          <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-signal" />
+          {LOAD_STAGE_LABELS[loadStage]}
+        </span>
+      ) : compiling ? (
         <span className="ml-auto font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
           compiling…
         </span>

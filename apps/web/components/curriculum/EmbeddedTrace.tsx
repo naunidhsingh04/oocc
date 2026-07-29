@@ -62,8 +62,15 @@ export function EmbeddedTrace({ fixture, caption }: EmbeddedTraceProps) {
   }
 
   if (!bundle) {
+    // docs/PRD.md §9: "no layout shift on trace load — skeleton panels
+    // reserve their space." The loaded card is header (~32px) + changed-
+    // locals row (~40px) + MiniRibbon row (~40px) + controls row (~32px)
+    // + a code block that's capped at max-h-72 (288px, `overflow-auto`
+    // beyond that) — every one of the twelve+ real fixtures embedded in
+    // an article is long enough to hit that cap, so this fixed height
+    // matches the loaded card almost exactly rather than guessing low.
     return (
-      <div className="h-40 animate-pulse border border-rule bg-panel" aria-label="Loading embedded trace" />
+      <div className="h-[27rem] animate-pulse border border-rule bg-panel" aria-label="Loading embedded trace" />
     );
   }
 

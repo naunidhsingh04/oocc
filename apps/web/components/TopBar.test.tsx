@@ -12,10 +12,10 @@ const mockUsePathname = vi.mocked(usePathname);
 
 describe("TopBar", () => {
   it("marks the current route as the active nav link", () => {
-    mockUsePathname.mockReturnValue("/styleguide");
+    mockUsePathname.mockReturnValue("/compiler");
     render(<TopBar onOpenPalette={() => {}} />);
 
-    expect(screen.getByRole("link", { name: "Styleguide" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Compiler" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 

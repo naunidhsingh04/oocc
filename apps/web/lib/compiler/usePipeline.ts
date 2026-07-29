@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildAstIndex, buildInstructionIndex } from "./astIndex";
-import { compileInWorker } from "./client";
+import { type CompilerLoadStage, compileInWorker, onCompilerLoadStage } from "./client";
 import { buildCompilerChannels, computeVmTicks } from "./ticks";
 import type { PipelineResult, StageTimings } from "./types";
 
@@ -12,6 +12,10 @@ export interface PipelineView {
   result: PipelineResult | null;
   timings: StageTimings | null;
   compiling: boolean;
+  /** Real WASM-load progress (docs/PRD.md §9), null once the module has
+   * loaded once this session — only the very first compile pays this
+   * cost, so this never flickers back on for later keystrokes. */
+  loadStage: CompilerLoadStage | null;
   astIndex: ReturnType<typeof buildAstIndex> | null;
   instructionIndex: ReturnType<typeof buildInstructionIndex> | null;
   channels: Map<string, number>;
@@ -29,8 +33,15 @@ export function usePipeline(initialSource: string): PipelineView {
   const [result, setResult] = useState<PipelineResult | null>(null);
   const [timings, setTimings] = useState<StageTimings | null>(null);
   const [compiling, setCompiling] = useState(false);
+  const [loadStage, setLoadStage] = useState<CompilerLoadStage | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeq = useRef(0);
+
+  useEffect(() => {
+    return onCompilerLoadStage((stage) => {
+      setLoadStage(stage === "ready" ? null : stage);
+    });
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -69,5 +80,5 @@ export function usePipeline(initialSource: string): PipelineView {
     [result, channels],
   );
 
-  return { source, setSource, result, timings, compiling, astIndex, instructionIndex, channels, vmTicks };
+  return { source, setSource, result, timings, compiling, loadStage, astIndex, instructionIndex, channels, vmTicks };
 }

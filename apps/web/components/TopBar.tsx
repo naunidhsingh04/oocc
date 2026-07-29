@@ -6,13 +6,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 
+// docs/PRD.md §9's final design critique: "remove one thing that is not
+// carrying information." /styleguide is a real, still-reachable page (an
+// internal design-token/component reference) but it's meta-tooling, not
+// something a learner using this product needs — promoting it to the
+// persistent top-level nav next to Problems/Curriculum/Progress was noise,
+// not signal, so it's off this list without deleting the page itself.
 const NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/problems", label: "Problems" },
   { href: "/curriculum", label: "Curriculum" },
   { href: "/progress", label: "Progress" },
   { href: "/compiler", label: "Compiler" },
-  { href: "/styleguide", label: "Styleguide" },
 ];
 
 export interface TopBarProps {

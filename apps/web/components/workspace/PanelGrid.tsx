@@ -12,6 +12,12 @@ interface PanelGridProps {
    * are persisted per key, and switching keys re-seeds from that run's own
    * plan (see usePanelArrangement). */
   storageKey: string;
+  /** docs/PRD.md §9: `NarrowWorkspace`'s "Visual" tab is only ~340px wide
+   * after padding — a `"primary+stack"` plan's side-by-side `orientation="horizontal"`
+   * split squeezes both panes below their `minSize`, overlapping their own
+   * headers. Forces the same flat vertical `PanelStack` the `"meta"`-layout
+   * fallback already uses, regardless of the plan's own layout string. */
+  forceStacked?: boolean;
 }
 
 interface Arrangement {
@@ -31,7 +37,7 @@ interface Arrangement {
  * hairlines either way (PRD §6.2), react-resizable-panels' own handles are
  * the only visual seam.
  */
-export function PanelGrid({ plan, storageKey }: PanelGridProps) {
+export function PanelGrid({ plan, storageKey, forceStacked = false }: PanelGridProps) {
   const { panels, layout, addPanel, removePanel, retypePanel, maximizedId, setMaximizedId, availableTypes } =
     usePanelArrangement(plan, storageKey);
   const arrangement: Arrangement = { availableTypes, removePanel, retypePanel, setMaximizedId };
@@ -65,7 +71,7 @@ export function PanelGrid({ plan, storageKey }: PanelGridProps) {
           <div className="flex h-full items-center justify-center font-mono-label text-[12px] text-ink-soft">
             No panels — add one above.
           </div>
-        ) : layout === "primary+stack" && primary ? (
+        ) : layout === "primary+stack" && primary && !forceStacked ? (
           <ResizableSplit id={`oocc-panel-grid-${storageKey}`} orientation="horizontal">
             <ResizablePane id="primary" defaultSize="45" minSize="20">
               <PanelFrame

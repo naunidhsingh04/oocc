@@ -32,17 +32,18 @@ export function ArrayPanel({ panel }: VizPanelProps) {
       onValueChange={(value) => setMode(value as ArrayViewMode)}
       className="flex h-full flex-col"
     >
-      <Panel
-        title="Array"
-        className="min-h-0 flex-1"
-        actions={
-          <TabsList className="gap-2 border-none">
-            <TabsTrigger value="bars">Bars</TabsTrigger>
-            <TabsTrigger value="cells">Cells</TabsTrigger>
-          </TabsList>
-        }
-        bodyClassName="p-4"
-      >
+      {/* The Bars/Cells toggle used to live in Panel's `actions` slot (the
+          title bar's own right edge) — PanelFrame's floating retype/
+          maximize/remove controls are absolutely positioned over that
+          same top-right corner (see PanelFrame.tsx), so the two collided
+          at every width, not just narrow ones (found via a live
+          screenshot, not just code review). A second row below the title
+          bar has no such collision. */}
+      <Panel title="Array" className="min-h-0 flex-1" bodyClassName="flex flex-col gap-2 p-4">
+        <TabsList className="shrink-0 gap-2">
+          <TabsTrigger value="bars">Bars</TabsTrigger>
+          <TabsTrigger value="cells">Cells</TabsTrigger>
+        </TabsList>
         {view ? (
           <ArrayView view={view} mode={mode} />
         ) : (
@@ -66,7 +67,7 @@ function ArrayView({
   const windowTo = view.window ? Math.max(view.window.fromIndex, view.window.toIndex) : -1;
 
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="relative flex flex-1 items-end gap-1" data-testid="array-cells">
         {view.values.map((value, index) => {
           const changed = view.changedIndices.has(index);

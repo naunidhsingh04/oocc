@@ -20,8 +20,13 @@ class ChannelDotsMarker extends GutterMarker {
     wrap.className = "cm-oocc-channel-dots";
     for (const dot of this.dots) {
       const el = document.createElement("span");
-      el.className = "cm-oocc-channel-dot";
+      // docs/PRD.md §9: a channel dot's color alone can't distinguish one
+      // variable from another for a colorblind user — each channel also
+      // gets a distinct shape (see theme.ts's cm-oocc-channel-dot--N rules)
+      // on top of the hover-only name in `title`.
+      el.className = `cm-oocc-channel-dot cm-oocc-channel-dot--${dot.channel}`;
       el.style.backgroundColor = `var(--color-ch-${dot.channel})`;
+      el.style.borderColor = `var(--color-ch-${dot.channel})`;
       el.title = dot.name;
       wrap.appendChild(el);
     }

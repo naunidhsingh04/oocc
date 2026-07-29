@@ -87,17 +87,50 @@ export function CompilerRibbon({ ticks, currentStep, onScrub }: CompilerRibbonPr
     [stepCount, onScrub],
   );
 
+  // Local-state-driven like MiniRibbon, so it needs its own key handler
+  // rather than relying on the workspace's global keyboard shortcuts.
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLCanvasElement>) => {
+      if (stepCount === 0) return;
+      const last = stepCount - 1;
+      switch (event.key) {
+        case "ArrowRight":
+          event.preventDefault();
+          onScrub(Math.min(last, currentStep + (event.shiftKey ? 10 : 1)));
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          onScrub(Math.max(0, currentStep - (event.shiftKey ? 10 : 1)));
+          break;
+        case "Home":
+          event.preventDefault();
+          onScrub(0);
+          break;
+        case "End":
+          event.preventDefault();
+          onScrub(last);
+          break;
+        default:
+          break;
+      }
+    },
+    [stepCount, currentStep, onScrub],
+  );
+
   return (
     <div ref={containerRef} className="w-full shrink-0" style={{ height: RIBBON_HEIGHT }}>
       <canvas
         ref={canvasRef}
+        tabIndex={0}
         className="block cursor-pointer"
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         role="slider"
-        aria-label="VM step ribbon"
+        aria-label="VM step ribbon — arrow keys step, shift-arrow jumps 10, Home/End jump to the ends"
         aria-valuemin={0}
         aria-valuemax={Math.max(0, stepCount - 1)}
         aria-valuenow={currentStep}
+        aria-valuetext={`Step ${currentStep} of ${Math.max(0, stepCount - 1)}`}
       />
     </div>
   );
