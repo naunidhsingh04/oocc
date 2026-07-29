@@ -98,3 +98,23 @@ def test_second_run_of_the_same_program_is_served_from_cache(
     # executor had actually re-run, so an identical trace is the tell.
     assert first.json()["trace"] == second.json()["trace"]
     assert len(cache) == 1
+
+
+def test_a_syntax_error_returns_a_playable_trace_not_a_500(
+    executor_client: ExecutorClient, cache: InMemoryCache
+) -> None:
+    """docs/AUDIT.md Pass 5: end to end through the *whole* pipeline
+    (executor + digest + all four deterministic analyzers + viz_planner),
+    not just the executor in isolation — a `status: "compile_error"` trace
+    has an empty `steps` array, and nothing downstream may choke on that."""
+    client = _client(executor_client, cache)
+    response = client.post("/api/runs", json={"source": "def foo(:\n    pass\n"})
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trace"]["status"] == "compile_error"
+    assert body["trace"]["error"]["type"] == "SyntaxError"
+    assert body["analysis"]["structures"] == []
+    assert body["analysis"]["insights"] == []
+    assert body["analysis"]["complexity"] is None

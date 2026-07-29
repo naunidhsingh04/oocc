@@ -157,7 +157,41 @@ class Tracer:
 
     def run(self, source: str, *, stdin: str = "") -> dict[str, Any]:
         source_hash = "sha256:" + hashlib.sha256(source.encode()).hexdigest()
-        code = compile(source, USER_CODE_FILENAME, "exec")
+        try:
+            code = compile(source, USER_CODE_FILENAME, "exec")
+        except SyntaxError as exc:
+            # A syntax error (also covers IndentationError/TabError, both
+            # SyntaxError subclasses) used to propagate straight out of
+            # `run()` uncaught — a 500 from the executor's own HTTP layer
+            # for one of the single most common inputs a real user will
+            # ever submit (found live during the pre-launch audit's Pass 5:
+            # `def foo(:` crashed the service outright, no trace, no
+            # message). `status: "compile_error"` already exists in the
+            # trace contract's own Status enum for exactly this — it was
+            # simply never wired up for the Python path (C++'s own
+            # `compile_service.py` already uses it for clang diagnostics).
+            # Nothing executed, so this returns before `self._start_time`
+            # or any monitoring setup — a genuinely empty, valid trace.
+            return {
+                "schema_version": SCHEMA_VERSION,
+                "run_id": "r_" + hashlib.sha256(source_hash.encode()).hexdigest()[:16],
+                "language": "python",
+                "source_hash": source_hash,
+                "status": "compile_error",
+                "meta": {
+                    "duration_ms": 0.0,
+                    "step_count": 0,
+                    "truncated": False,
+                    "stdin": stdin,
+                    "peak_heap_objects": 0,
+                },
+                "error": {
+                    "type": type(exc).__name__,
+                    "message": exc.msg or str(exc),
+                    "line": exc.lineno if exc.lineno is not None else 1,
+                },
+                "steps": [],
+            }
         run_globals: dict[str, Any] = {
             "__name__": "__main__",
             "__doc__": None,
@@ -586,7 +620,11 @@ class CounterTracer:
         self._start_time = 0.0
 
     def run(self, source: str, *, stdin: str = "") -> dict[str, Any]:
-        code = compile(source, USER_CODE_FILENAME, "exec")
+        try:
+            code = compile(source, USER_CODE_FILENAME, "exec")
+        except SyntaxError:
+            # Same fix as Tracer.run — see its comment for the full story.
+            return {"status": "compile_error", "step_count": 0, "duration_ms": 0.0}
         run_globals: dict[str, Any] = {
             "__name__": "__main__",
             "__doc__": None,

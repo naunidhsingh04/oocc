@@ -504,3 +504,72 @@ just their names) to confirm they test what they claim, and added the
 No launch-blocking gaps found in this pass beyond what Pass 1/2 already
 surfaced (container hardening, unverified memory limit).
 
+---
+
+## Pass 5 — the edges of normal use
+
+Narrower than a full pass given a session-budget constraint flagged
+mid-audit — picked the highest-value checks rather than exhaustive
+coverage of every scenario named in the brief.
+
+### The launch blocker this pass exists to find
+
+**A plain Python syntax error crashed the executor with an unhandled 500.**
+Not an adversarial input — a fat-fingered bracket, missing colon, or
+mismatched indentation, i.e. one of the single most common things a real
+user will type into a code editor. Found by directly running the real
+`Tracer`:
+
+```
+Tracer().run("def foo(:\n  pass\n")
+-> SyntaxError: invalid syntax (<oocc-user>, line 1)   [uncaught, propagates out of run()]
+```
+
+...and confirmed at the HTTP layer:
+
+```
+POST /execute {"source": "def foo(:\n  pass\n"}  ->  500 Internal Server Error
+```
+
+Root cause: `Tracer.run`/`CounterTracer.run` call `compile(source, ...)`
+at the very top, *before* the try/except that catches runtime errors —
+a `SyntaxError` (or its subclasses `IndentationError`/`TabError`) had
+nowhere to land. The trace contract's own `Status` enum already has
+`"compile_error"` for exactly this (verified in Pass 2 — it's used by the
+C++ path's clang diagnostics, but was never wired up for Python at all).
+
+**Fixed**: both `run()` methods now catch the compile step's `SyntaxError`
+and return a well-formed, schema-valid trace with `status: "compile_error"`
+and a populated `error` object (`type`, `message`, `line`) — no execution
+ever starts, so this returns before any monitoring/state setup, a
+genuinely empty (`steps: []`) but valid trace. Verified against four real
+variants (plain syntax error, indentation error, unterminated string,
+mismatched paren, tab/space mixing) — all produce the correct `type` name
+and a sensible line number. Verified **through the entire pipeline**, not
+just the executor in isolation: `POST /api/runs` with this exact source
+now returns `200` with `analysis.structures == []`, `analysis.insights ==
+[]`, `analysis.complexity is None` — none of the four deterministic
+analyzers choke on an empty-steps trace. Four new regression tests added
+(`test_execute.py` ×2, `test_runs.py` ×1 end-to-end through the real
+pipeline, plus the executor-level check already covered above) — full
+suites re-run clean: **262 apps/api tests, 38 services/executor tests**,
+ruff and mypy clean on both packages.
+
+### Other checks
+
+| Case | Result | Evidence |
+|---|---|---|
+| Invalid provider key | verified | `POST /api/settings/validate-key` with a garbage key → `200 {"valid": false, "error": "invalid_key"}`, no crash. Confirmed as a real side-effect: the request-log line itself shows `x-provider-key: "[redacted]"` — the redaction pipeline (Pass 2/4) is live on this exact path, not just in tests. |
+| 40k-step trace | verified (data-level; live playback already Playwright-verified earlier in this project's history, not re-run this pass for budget reasons) | `fixtures/large_trace_40k.trace.json`: 39,976 real steps, `status: "ok"`, `truncated: false` |
+| No key set → deterministic features still work | verified (Pass 2/3 already confirmed the mechanism; not re-run live this pass) | |
+
+### Not reached this pass, for budget reasons
+
+Empty file / one-line / print-only / no-output programs were checked at
+the executor level only (all `status: "ok"`, no crashes — see the batch
+check above) — not re-verified through the full frontend UI. Two-tabs,
+scrubbing-while-executing, panel-resize-to-nothing, and the full language-
+selector matrix were not exercised this pass. None of these are known or
+suspected to be broken — they're simply unverified, stated as such rather
+than silently assumed fine.
+

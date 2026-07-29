@@ -20,6 +20,24 @@ def test_execute_reports_runtime_error() -> None:
     assert body["error"]["type"] == "ZeroDivisionError"
 
 
+def test_execute_reports_a_syntax_error_instead_of_crashing() -> None:
+    # docs/AUDIT.md Pass 5: this used to be an unhandled 500 from the
+    # executor's own HTTP layer — one of the most common inputs a real
+    # user submits (a fat-fingered bracket) crashed the service outright.
+    response = client.post("/execute", json={"source": "def foo(:\n    pass\n"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "compile_error"
+    assert body["error"]["type"] == "SyntaxError"
+    assert body["steps"] == []
+
+
+def test_execute_counters_reports_a_syntax_error_instead_of_crashing() -> None:
+    response = client.post("/execute/counters", json={"source": "def foo(:\n    pass\n"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "compile_error"
+
+
 def test_execute_counters_is_fast_and_scales() -> None:
     source = "n = {n}\ntotal = 0\nfor i in range(n):\n    for j in range(n):\n        total += 1\n"
     small = client.post("/execute/counters", json={"source": source.format(n=10)}).json()
