@@ -1474,6 +1474,87 @@ sessions must respect:
   kind of "looks like everything's broken" false alarm a future session
   could otherwise chase for an hour.
 
+## Pre-launch audit (Passes 1-7, done) — read this before touching the executor
+
+A 7-pass audit against `docs/PRD.md` (full findings and evidence:
+`docs/AUDIT.md`, one section per pass). Not a PRD-numbered phase — a
+cross-cutting verification exercise. Things a future session must not
+silently undo or re-break:
+
+- **The `mypy` gotcha that hid 82 real errors for this project's entire
+  history**: mypy's config-file discovery is relative to the *current
+  working directory*, not the target path. Every documented command in
+  this file (`uv run --package oocc-api mypy apps/api/app`) was being run
+  from the repo root, where there is no `[tool.mypy]` section — so it was
+  silently checking under mypy's lenient defaults, never this project's
+  own `strict = true`. **Run mypy from inside the package directory**
+  (`cd apps/api && uv run --package oocc-api mypy app`), not from repo
+  root, or the strict config won't apply and you'll get a false "clean."
+  `services/cpp-executor` had no `[tool.mypy]` section at all before this
+  audit — it does now (with a documented `ignore_missing_imports` override
+  for `clang.*`, which has no type stubs anywhere on PyPI).
+- **A plain Python `SyntaxError` used to crash the executor with an
+  unhandled 500** — `Tracer.run`/`CounterTracer.run` called `compile()`
+  before the try/except that catches everything else. Fixed: both now
+  catch the compile step and return `status: "compile_error"` (already in
+  the schema, only ever used by the C++ path before this). If you ever
+  restructure `Tracer.run`'s top, keep the compile step inside its own
+  try/except — this is exactly the kind of thing that's easy to
+  reintroduce by moving code around.
+- **Wall-clock and step-count breaches used to share one exception type**
+  (`StepLimitReached`), so `status: "timeout"` was never actually
+  producible — every time-based stop was mislabeled `step_limit`. Fixed
+  with `WallClockLimitReached` (subclasses `StepLimitReached`, so any
+  incidental `except StepLimitReached` elsewhere still catches it, but
+  `run()` checks for it first). `Tracer`'s default `wall_clock_limit_s` is
+  now `5.0` (was `15.0`); `apps/api/app/routers/runs.py` passes `10.0` for
+  authed users, `5.0` otherwise, per PRD §3.3.
+- **The deterministic-output cache key doesn't vary by caller, but the
+  wall-clock budget now does** (5s vs 10s authed) — `run_pipeline_cached`
+  therefore never caches a `status: "timeout"` result, so an unauthed
+  caller's short-budget timeout can't get served to a later authed caller
+  who'd have gotten more time. If you ever add another per-caller
+  parameter that affects trace *content* (not just cosmetics), check
+  whether it needs the same treatment before assuming the cache is safe.
+- **The Python-level memory limit (`resource.setrlimit(RLIMIT_AS, ...)`,
+  `_set_memory_limit()` in `tracer.py`) was directly tested against a real
+  oversized allocation and confirmed *not enforced on macOS*** — the
+  process's real memory climbed past 3GB before it was killed by hand
+  during verification. This is a known Darwin/XNU kernel behavior, not a
+  bug in this code; `RLIMIT_AS` is reliably enforced on Linux (the actual
+  Fly.io deployment target), but that has never been verified in any
+  session because no Linux environment has been available. **Do not read
+  "a memory limit exists" as "a memory limit works"** until someone
+  confirms it on the real target. The container-level `--memory 256m` in
+  `docker-compose.yml` (added this audit) is the mechanism actually meant
+  to hold this line; it's also unverified — no `docker` binary has ever
+  been available in any session's sandbox.
+- **`docker-compose.yml`'s `executor` service now sets most of PRD §5's
+  container flags** (`read_only`, `tmpfs`, `cap_drop: [ALL]`,
+  `security_opt`, `mem_limit`, `cpus`, `pids_limit`, non-root `user`) —
+  **deliberately not** `network_mode: none`, which PRD literally names.
+  Setting it would cut off `api`'s own ability to reach `executor` over
+  the compose network — the sandbox boundary PRD means is the untrusted
+  *user code's* execution environment, which today shares a process (and
+  therefore a network namespace) with the FastAPI server that has to stay
+  reachable. Only gVisor/nsjail's per-run isolation can give one `exec()`
+  call its own network namespace without also cutting off the service
+  answering HTTP requests. None of this config has been runtime-tested.
+- **The sandbox's known escape is still open, on purpose, with a passing
+  test that proves it**: `services/executor/tests/test_sandbox_imports.py
+  ::test_subclasses_gadget_bypasses_the_import_blocklist` exists
+  specifically so `().__class__.__bases__[0].__subclasses__()` reaching
+  arbitrary loaded classes doesn't get silently "fixed" by some unrelated
+  future change without anyone noticing what actually closed it (only
+  gVisor/nsjail should ever make this test start failing — if it starts
+  failing for any other reason, that's a regression in the test, not a
+  security win).
+- **Recommendation on record, not yet acted on**: don't actually turn on
+  the 10s-for-authed-users wall-clock extension in a real deployment
+  before gVisor/nsjail lands. It's correctly built and tested, but its
+  only effect right now is giving more-trusted users more time inside an
+  interpreter with a known, open, currently-unfixed escape route.
+
 ## Tests ship with the code they test
 
 No follow-up PR to "add tests later." If it's worth writing, it's worth a
