@@ -479,3 +479,28 @@ session budget constraint flagged mid-audit.
 No gaps found in this pass — the central promise holds under every check
 run. Committing and moving to Pass 4.
 
+---
+
+## Pass 4 — hostile input
+
+Narrower than a from-scratch pass — the adversarial suite already existed
+(Phase 6 backend, per CLAUDE.md) and Pass 1/2 already ran the key-leak test
+directly. This pass re-ran everything, read the actual test bodies (not
+just their names) to confirm they test what they claim, and added the
+"boring web" checks live rather than trusting prior claims.
+
+| Check | Result | Evidence |
+|---|---|---|
+| Python adversarial suite (28 tests: fork bomb via import-block, `while True`, deep recursion, 1e9-range, unicode bomb, memory growth) | verified | `pytest test_adversarial.py test_sandbox_imports.py -v` → 28/28 passed. Read `test_subclasses_gadget_bypasses_the_import_blocklist` directly — it's a real, honest regression test *proving the known escape still works*, not hiding it. |
+| `os.system`/socket/`open('/etc/passwd')`/subprocess-based fork bombs | verified | All structurally impossible without an allowed import — `os`, `subprocess`, `socket`, `ctypes`, `multiprocessing`, `pickle`, `shutil`, `pathlib`, `importlib` all in the parametrized blocklist test, all fail |
+| C++: hostile input to clang, compile bombs, pathological depth | verified | `pytest test_instrument_isolated.py -v` → 4/4, including a real 40,000-term expression-chain parser crash, contained via `instrument_isolated`'s process isolation, and a hang stopped by its own timeout. `MAX_SOURCE_BYTES = 200_000` enforced in `compile_service.py`; both real `clang++` subprocess calls (traced and untraced-fallback paths) have `timeout=30`, confirmed by reading `toolchain.py`/`compile_service.py` directly (a real Phase 6 fix — no timeout existed on these before it) |
+| Key-leak test | verified | Read the full test body, not just its name: it genuinely checks all 4 claimed surfaces (rendered log stream, SSE response body, every prompt string sent to the fake model, every row in the concept-chunk store) against a real sentinel key through a real request/response cycle. Passed (re-ran in Pass 2, re-confirmed by direct reading here). |
+| No secrets committed to the repo | verified | `grep -rlE "AIza[0-9A-Za-z_-]{35}\|sk-[a-zA-Z0-9]{20,}\|-----BEGIN.*PRIVATE KEY"` across the whole tree (excluding `node_modules`/`.venv`) → zero hits outside the test file's own deliberate sentinel string |
+| No secrets in the client bundle | verified | `grep` the built `.next/static/chunks/*.js` for `GEMINI`/`DATABASE_URL`/`REDIS_URL`/`EXECUTOR_URL`/`SECRET` → zero hits; only the deliberately-public `NEXT_PUBLIC_API_URL` appears, exactly as Next.js's own `NEXT_PUBLIC_*` convention intends |
+| Rate limits actually enforced | verified | `pytest test_rate_limit.py -v` → 4/4, including a real 429 from the actual `/api/runs` route once the limiter says no |
+| No raw stack traces to users | verified | `app/main.py`'s global exception handler returns a fixed `{"error": "internal_error"}` body — no exception internals, ever, on any unhandled error |
+| Authz on endpoints touching user data | verified, live, gap closed | Called the real endpoints: `TestClient(app).get("/api/progress")` and `.get("/api/progress/review-queue")` with zero auth headers both returned **401**. Nothing in the suite asserted this — added `apps/api/tests/test_progress_authz.py` (2 tests) so a regression here is now caught. Full suite re-run: **261 passed**. |
+
+No launch-blocking gaps found in this pass beyond what Pass 1/2 already
+surfaced (container hardening, unverified memory limit).
+
