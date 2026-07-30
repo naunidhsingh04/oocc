@@ -15,17 +15,10 @@ const Workspace = dynamic(() => import("./Workspace").then((mod) => mod.Workspac
   loading: () => <div className="flex min-h-0 flex-1 flex-col" />,
 });
 
-const LandingWorkspace = dynamic(
-  () => import("./LandingWorkspace").then((mod) => mod.LandingWorkspace),
-  { ssr: false, loading: () => <div className="flex min-h-0 flex-1 flex-col" /> },
-);
-
+/** `/play`'s entry point — the real, full editor+panels+ribbon+tutor
+ * workspace. `/` is a separate, minimal marketing landing
+ * (`components/home/`) that no longer embeds this at all — see that
+ * directory's docstring for why splitting them was the point. */
 export function WorkspaceLoader() {
   return <Workspace />;
-}
-
-/** `/`'s own entry point — see LandingWorkspace.tsx for what makes this
- * different from the plain WorkspaceLoader every other route uses. */
-export function HomeWorkspaceLoader() {
-  return <LandingWorkspace />;
 }

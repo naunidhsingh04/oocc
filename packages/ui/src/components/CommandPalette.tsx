@@ -36,9 +36,9 @@ export function CommandPalette({
       label="Command palette"
       shouldFilter
       loop
-      overlayClassName="fixed inset-0 z-50 bg-ink/40"
+      overlayClassName="fixed inset-0 z-modal bg-ink/40"
       contentClassName={cn(
-        "fixed left-1/2 top-[20vh] z-50 w-full max-w-lg -translate-x-1/2 rounded-control border border-rule bg-panel shadow-menu",
+        "fixed left-1/2 top-[20vh] z-modal w-full max-w-lg -translate-x-1/2 rounded-control border border-rule bg-panel shadow-menu",
       )}
     >
       <div className="flex items-center gap-2 border-b border-rule px-3">

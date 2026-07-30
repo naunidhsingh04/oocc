@@ -13,9 +13,19 @@ const containerVariants: Variants = {
   show: { transition: { staggerChildren: 0.04 } },
 };
 
+// Opacity only — no `y` offset. `app/template.tsx` already slides the
+// *whole page* up on mount; giving each `StaggerItem` its own `y` motion
+// on top of that was a real, found bug (docs/PRD.md's "elements animating
+// while their parent is also animating"): every routed page compounded
+// two independent y-axis transforms in the same ~200ms window — the
+// page-level slide and each section's own slide — which is also a
+// same-element-animates-twice violation of this design system's own
+// restraint rule. Only one of the two should own vertical motion;
+// Stagger's job is sequencing *when* content reveals, not *how far* it
+// moves, so it kept the fade and dropped the offset.
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } },
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { duration: 0.2, ease: "easeOut" } },
 };
 
 /**

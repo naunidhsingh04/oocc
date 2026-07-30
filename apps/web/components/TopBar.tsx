@@ -15,6 +15,7 @@ import { ThemeToggle } from "./ThemeToggle";
 // not signal, so it's off this list without deleting the page itself.
 const NAV_LINKS = [
   { href: "/", label: "Home" },
+  { href: "/play", label: "Playground" },
   { href: "/problems", label: "Problems" },
   { href: "/curriculum", label: "Curriculum" },
   { href: "/progress", label: "Progress" },
@@ -36,12 +37,25 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   const reduceMotion = useReducedMotion();
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-rule bg-panel px-4">
-      <div className="flex items-center gap-6">
-        <Link href="/" className="font-display text-[17px] font-bold tracking-[-0.02em] text-ink">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-rule bg-panel px-4">
+      {/* min-w-0 lets this flex child actually shrink below its content
+          width instead of forcing the header wider than the viewport (a
+          bare `flex` item defaults to `min-width: auto`, i.e. "never
+          smaller than my content"); overflow-x-auto on the nav itself
+          means a narrow viewport gets a scrollable nav instead of nav
+          items silently rendering past the edge of the screen with no way
+          to reach them — found at 375px with six top-level links.
+          `min-w-[7rem]` on the nav is load-bearing, not decorative: giving
+          a scroll container `overflow`  makes its browser-computed
+          automatic minimum width `0` (the CSS flexbox spec's own rule for
+          scroll containers), so without an explicit floor the nav doesn't
+          just scroll, it collapses to a sliver first — found live, the
+          first fix over-corrected into a second, more severe bug. */}
+      <div className="flex min-w-0 items-center gap-6">
+        <Link href="/" className="shrink-0 font-display text-[17px] font-bold tracking-[-0.02em] text-ink">
           OOCC
         </Link>
-        <nav className="flex items-center gap-1" aria-label="Primary">
+        <nav className="flex min-w-28 items-center gap-1 overflow-x-auto" aria-label="Primary">
           {NAV_LINKS.map((link) => {
             const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
             return (
@@ -50,7 +64,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
                 href={link.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative rounded-control px-3 py-2 font-body text-[14px] font-medium transition-colors duration-150",
+                  "relative shrink-0 rounded-control px-3 py-2 font-body text-[14px] font-medium transition-colors duration-150",
                   active ? "text-ink" : "text-ink-soft hover:text-ink",
                 )}
               >
@@ -67,7 +81,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           })}
         </nav>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <SettingsPanel />
         <ThemeToggle />
         <Button variant="secondary" size="sm" onClick={onOpenPalette}>

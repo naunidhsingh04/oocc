@@ -69,7 +69,7 @@ export function ThemeToggle() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -4, scale: 0.98 }}
             transition={{ duration: reduceMotion ? 0.01 : 0.15, ease: "easeOut" }}
-            className="absolute right-0 top-full z-50 mt-2 w-44 rounded-panel border border-rule bg-panel p-1.5 shadow-menu"
+            className="absolute right-0 top-full z-dropdown mt-2 w-44 rounded-panel border border-rule bg-panel p-1.5 shadow-menu"
           >
             {THEME_IDS.map((id) => {
               const meta = THEME_META[id];

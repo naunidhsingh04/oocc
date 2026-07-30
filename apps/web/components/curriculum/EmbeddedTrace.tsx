@@ -91,7 +91,7 @@ export function EmbeddedTrace({ fixture, caption }: EmbeddedTraceProps) {
       plan: bundle.plan,
       analysis: bundle.analysis,
     });
-    router.push("/");
+    router.push("/play");
   }} />;
 }
 

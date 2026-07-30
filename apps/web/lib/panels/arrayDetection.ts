@@ -23,6 +23,24 @@ export interface ArrayView {
   window: ArrayWindow | null;
 }
 
+/**
+ * The in-scope local name currently bound to a heap ref, if any — e.g.
+ * `"arr"` for `o1` in a frame with `arr = [...]` — used only to phrase the
+ * plain-English step caption ("comparing arr[2] and arr[3]"); never for
+ * classification, which stays purely structural per this file's own rule.
+ * Innermost frame wins, same shadowing rule `computeArrayView`'s own
+ * pointer search already uses.
+ */
+export function findBindingName(step: ResolvedStep | undefined, binding: string | undefined): string | undefined {
+  if (!step || !binding) return undefined;
+  for (let i = step.stack.length - 1; i >= 0; i -= 1) {
+    for (const [name, value] of Object.entries(step.stack[i]!.locals)) {
+      if (value !== null && "ref" in value && value.ref === binding) return name;
+    }
+  }
+  return undefined;
+}
+
 function isPrimitiveValue(value: Value): boolean {
   return value === null || (typeof value === "object" && "val" in value);
 }

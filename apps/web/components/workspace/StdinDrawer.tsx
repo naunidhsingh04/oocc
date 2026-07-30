@@ -20,7 +20,7 @@ export function StdinDrawer() {
         Stdin
       </Button>
       {open ? (
-        <div className="absolute right-0 top-full z-10 mt-1 w-72 rounded-control border border-rule bg-panel p-2 shadow-menu">
+        <div className="absolute right-0 top-full z-dropdown mt-1 w-72 rounded-control border border-rule bg-panel p-2 shadow-menu">
           <div className="mb-1 font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
             Recorded stdin
           </div>

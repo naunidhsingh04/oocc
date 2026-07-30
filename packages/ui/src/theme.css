@@ -90,6 +90,38 @@
   --font-body: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono-label: var(--font-ibm-plex-mono), ui-monospace, "SF Mono", monospace;
   --font-editor: var(--font-jetbrains-mono), ui-monospace, "SF Mono", monospace;
+
+  /*
+   * The layering scale (docs/PRD.md — "one documented layering scale,"
+   * replacing ad-hoc z-index values). Every stacking-context class in this
+   * app must come from this list — never a bare `z-10`/`z-50`/etc picked
+   * because it "felt high enough." Found and fixed by this audit: every
+   * floating surface (the theme picker, the settings popover, the onboarding
+   * tour, the command palette, tooltips, toasts) previously used `z-50`
+   * identically, so which one painted on top of another was decided by
+   * accidental DOM/mount order, not by any actual precedence rule — e.g. a
+   * toast fired while the command palette was open, or a tooltip triggered
+   * from inside the onboarding tour, had no guaranteed correct stacking.
+   * Low to high:
+   *   1. panel-controls — a panel's own floating maximize/retype/remove
+   *      buttons; above that panel's own content, nothing else.
+   *   2. dropdown — small anchored popovers (theme picker, settings, the
+   *      stdin drawer) — above all normal page content.
+   *   3. tour — the onboarding spotlight + its callout, a guided overlay
+   *      that should sit above dropdowns (it's actively directing
+   *      attention) but below a tooltip or a true modal.
+   *   4. tooltip — must stay readable even over the tour or a dropdown.
+   *   5. modal — the command palette's scrim + dialog: the "block
+   *      everything else" surface.
+   *   6. toast — always topmost; a confirmation/error toast must stay
+   *      visible even if it fires while a modal is open.
+   */
+  --z-index-panel-controls: 10;
+  --z-index-dropdown: 30;
+  --z-index-tour: 40;
+  --z-index-tooltip: 45;
+  --z-index-modal: 50;
+  --z-index-toast: 60;
 }
 
 @layer base {

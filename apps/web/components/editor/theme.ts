@@ -38,8 +38,18 @@ export const ooccEditorTheme: Extension = EditorView.theme(
       fontSize: "11px",
       padding: "0 6px 0 4px",
     },
+    // A strong, unmistakable current-line marker (docs/PRD.md: "not a
+    // faint background tint") — a solid left bar plus a real tint, the
+    // same combination a debugger's current-statement marker uses, not
+    // just a slightly-different shade of the editor background.
     ".cm-oocc-current-line": {
-      backgroundColor: "color-mix(in srgb, var(--color-signal) 12%, transparent)",
+      backgroundColor: "color-mix(in srgb, var(--color-signal) 20%, transparent)",
+      // An inset box-shadow, not a real border — a real `border-left`
+      // adds to the line's box width, nudging its text 3px right only
+      // while it's current and back on the next step, a small but
+      // constant horizontal jitter every single step.
+      boxShadow: "inset 3px 0 0 0 var(--color-signal)",
+      transition: "background-color 120ms ease-out",
     },
     ".cm-oocc-breakpoint-gutter": {
       width: "14px",

@@ -123,7 +123,7 @@ export function OnboardingTour() {
       {rect ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-40 border-2 border-signal"
+          className="pointer-events-none fixed z-tour border-2 border-signal"
           style={{ top: rect.top - 2, left: rect.left - 2, width: rect.width + 4, height: rect.height + 4 }}
         />
       ) : null}
@@ -131,7 +131,7 @@ export function OnboardingTour() {
         role="dialog"
         aria-modal="false"
         aria-label={step.title}
-        className="fixed z-50 flex w-72 flex-col gap-2 border border-rule bg-panel p-3 shadow-menu"
+        className="fixed z-tour flex w-72 flex-col gap-2 border border-rule bg-panel p-3 shadow-menu"
         style={{ top: cardTop, left: cardLeft }}
       >
         <span className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">{step.title}</span>

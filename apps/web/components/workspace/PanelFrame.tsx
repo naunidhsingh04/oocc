@@ -31,7 +31,7 @@ export function PanelFrame({ panel, availableTypes, maximized, onRemove, onRetyp
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
-      <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
+      <div className="absolute right-1.5 top-1.5 z-panel-controls flex items-center gap-1">
         <select
           aria-label="Panel type"
           value={panel.type}

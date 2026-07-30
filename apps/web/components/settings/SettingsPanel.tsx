@@ -74,7 +74,7 @@ export function SettingsPanel() {
       </Button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+4px)] z-50 w-80 rounded-panel border border-rule bg-panel p-3 shadow-menu">
+        <div className="absolute right-0 top-[calc(100%+4px)] z-dropdown w-80 rounded-panel border border-rule bg-panel p-3 shadow-menu">
           <div className="flex items-center justify-between">
             <h3 className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
               Gemini API key

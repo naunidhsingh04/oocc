@@ -21,7 +21,7 @@ export function Tooltip({ content, children, side = "top" }: TooltipProps) {
           side={side}
           sideOffset={6}
           className={cn(
-            "z-50 rounded-control border border-rule bg-panel px-2.5 py-1.5 font-body text-[12px] font-medium text-ink shadow-menu",
+            "z-tooltip rounded-control border border-rule bg-panel px-2.5 py-1.5 font-body text-[12px] font-medium text-ink shadow-menu",
           )}
         >
           {content}

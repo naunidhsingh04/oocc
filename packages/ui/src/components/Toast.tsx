@@ -11,7 +11,7 @@ export function ToastViewport({ className }: { className?: string }) {
   return (
     <RadixToast.Viewport
       className={cn(
-        "fixed bottom-4 right-4 z-50 flex w-full max-w-sm list-none flex-col gap-2 outline-none",
+        "fixed bottom-4 right-4 z-toast flex w-full max-w-sm list-none flex-col gap-2 outline-none",
         className,
       )}
     />
