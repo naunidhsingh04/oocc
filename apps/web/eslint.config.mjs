@@ -24,9 +24,9 @@ const eslintConfig = [
       "node_modules/**",
       "next-env.d.ts",
       "public/compiler/**",
-      // Copied fixture JSON/source (pnpm --filter @oocc/web gen:fixtures-data)
-      // — data, not code; some of it is multi-MB, no reason to lint it.
-      "lib/fixtures/data/**",
+      // Merged fixture JSON (pnpm --filter @oocc/web gen:fixtures-data) —
+      // data, not code; some of it is multi-MB, no reason to lint it.
+      "public/fixtures-data/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

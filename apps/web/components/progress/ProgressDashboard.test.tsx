@@ -24,6 +24,18 @@ const mockFetchProgress = vi.mocked(fetchProgress);
 const mockFetchReviewQueue = vi.mocked(fetchReviewQueue);
 
 describe("ProgressDashboard", () => {
+  // No test asserts the transient "now === null" skeleton render directly:
+  // React Testing Library's render() flushes effects synchronously before
+  // returning (unlike a real browser, where the client's first paint and
+  // its effects are genuinely separate ticks), so by the time an
+  // assertion could run, `setNow`'s effect has already resolved past it.
+  // The guarantee this component actually needs — the server's render and
+  // the client's *first* render produce identical output — isn't
+  // something RTL can observe at all (it never does real SSR); it's
+  // covered by not calling `new Date()`/reading storage directly in the
+  // render body, not by a test that would just be asserting RTL's own
+  // effect-flushing behavior.
+
   it("never calls the session-gated progress endpoints when there's no session", async () => {
     mockHasActiveSession.mockResolvedValue(false);
 

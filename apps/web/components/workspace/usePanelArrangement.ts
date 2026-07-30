@@ -101,16 +101,30 @@ function dedupePanelIds(panels: PlanPanelNode[]): PlanPanelNode[] {
 export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   const seedPlan = plan ?? DEFAULT_PLAN;
 
-  const [panels, setPanels] = useState<PlanPanelNode[]>(() =>
-    dedupePanelIds(loadStored(storageKey)?.panels ?? seedPlan.panels),
-  );
+  // Deliberately seed with `seedPlan.panels` alone, never `loadStored(...)`,
+  // even though that means ignoring a real saved arrangement for one
+  // frame — a real hydration bug found auditing this hook (not
+  // hypothetical): `loadStored`'s own `typeof window === "undefined"`
+  // guard means this lazy initializer produced *different* panel lists
+  // between the server (always `seedPlan.panels`, no `window`) and the
+  // client's first render (`window` exists during hydration too, so it
+  // read a previously-saved arrangement immediately) — differing panel
+  // *count and types*, not just an attribute, exactly the shape of
+  // mismatch that fails hydration hardest. The `useEffect` below already
+  // ran on every mount (not just `storageKey` changes) and corrects to
+  // the real stored value right after — it just used to be redundant
+  // with the initializer instead of being the *only* source of the real
+  // value.
+  const [panels, setPanels] = useState<PlanPanelNode[]>(() => dedupePanelIds(seedPlan.panels));
   const [maximizedId, setMaximizedId] = useState<string | null>(null);
 
   // Re-seed whenever the underlying run changes, not on every plan object
   // identity change (a fixture reload creates a new plan object each time).
   // A `key`-prop remount would be the react-compiler-preferred shape for
   // this, but this hook is shared across pages that don't all want a full
-  // subtree remount on every run switch.
+  // subtree remount on every run switch. Also the one and only place
+  // `loadStored` (a real localStorage read) ever runs now — always
+  // client-only, always after mount, never during render.
   useEffect(() => {
     const stored = loadStored(storageKey);
     // eslint-disable-next-line react-hooks/set-state-in-effect

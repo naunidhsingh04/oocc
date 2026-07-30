@@ -79,9 +79,11 @@ export function useCommandRegistry(): CommandItem[] {
       onSelect: () => setTheme(id),
     }));
 
-    // Phase 1 has no run pipeline — fixtures are the only way to load a
-    // trace, and the dev-only /api/fixtures route 404s once built for
-    // production, so keep these out of a production palette too.
+    // Deliberately dev-only (unlike `fetchFixture` itself, which works
+    // fine in production now — see its own docstring): "Load fixture: X"
+    // for all eighteen internal fixture names is a debug convenience for
+    // developers, not something a real visitor needs in the command
+    // palette alongside playback/theme commands.
     const fixtures: CommandItem[] =
       process.env.NODE_ENV === "production"
         ? []

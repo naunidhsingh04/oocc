@@ -7,7 +7,7 @@ import { hasActiveSession } from "@/lib/progress/session";
 import { buildAttemptedConceptViews, buildConceptViews } from "@/lib/progress/views";
 import { selectWeakConcepts } from "@/lib/progress/weakConcepts";
 import type { ProgressRecord } from "@/lib/progress/types";
-import { Chip, ErrorBoundary, Stagger, StaggerItem } from "@oocc/ui";
+import { Chip, ErrorBoundary, Skeleton, Stagger, StaggerItem } from "@oocc/ui";
 import { useEffect, useState } from "react";
 import { ConceptGraph } from "./ConceptGraph";
 import { ReviewQueue } from "./ReviewQueue";
@@ -36,6 +36,17 @@ interface LoadedState {
  */
 export function ProgressDashboard() {
   const [state, setState] = useState<LoadedState | null>(null);
+  // `null` until a client-only effect sets the real value — never
+  // `new Date()` directly in the render body (a real hydration bug found
+  // auditing this component, not hypothetical: the server evaluates it at
+  // SSR time, the client evaluates it again during hydration, and the
+  // difference flows straight into demo data's relative timestamps and
+  // the review queue's overdue-day math, both of which land in rendered
+  // text). Same pattern as `state` above and `lib/theme/ThemeProvider.tsx`'s
+  // `useEffect`-deferred localStorage read — anything that can't be
+  // identical on the server and the client's first render waits for a
+  // client-only effect instead.
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +65,25 @@ export function ProgressDashboard() {
     };
   }, []);
 
-  const now = new Date();
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNow(new Date());
+  }, []);
+
+  if (now === null) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-5 p-5" aria-label="Loading progress">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-48 w-full" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
   const isDemo = state === null || state.progress === null;
 
   const progressRecords = state?.progress ?? buildDemoProgressRecords(now);

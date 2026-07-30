@@ -25,9 +25,11 @@ function formatValue(value: Value | undefined): string {
  * (see `components/home/`'s own docstring on `HomePage.tsx`), and sharing
  * one store between them would mean a visitor's real in-progress code at
  * `/play` bleeds into this canned demo the moment they navigate back here,
- * or vice versa. Best-effort like every other fixture-backed surface — the
- * dev-only `/api/fixtures` route 404s in production, and this just quietly
- * doesn't render rather than crashing (see `fetchFixture`'s docstring).
+ * or vice versa. Best-effort like every other fixture-backed surface:
+ * `fetchFixture` now works in production (a static asset under `public/`
+ * — see its own docstring), but the try/catch below stays regardless, so
+ * a genuine network hiccup degrades to "the section doesn't render" and
+ * never to a crash on the very first thing a visitor sees.
  */
 export function HeroDemo() {
   const [bundle, setBundle] = useState<FixtureBundle | null>(null);
@@ -39,8 +41,8 @@ export function HeroDemo() {
         if (!cancelled) setBundle(b);
       })
       .catch(() => {
-        // No dev-only fixture route reachable (e.g. production) — the
-        // section below just never mounts. Never a crash.
+        // A genuine network failure — the section below just never
+        // mounts. Never a crash.
       });
     return () => {
       cancelled = true;
