@@ -10,10 +10,24 @@ Same request-scoped-key rules as everywhere else (PRD §4.5): the key
 reaches this handler only via `ProviderKey`, is never logged, and any
 upstream error is reported as a generic reason string, never the SDK
 exception's own message (which could echo request internals).
+
+`error` is one of `no_key` / `invalid_key` / `rate_limited` /
+`upstream_unavailable` — not just a blanket "invalid_key" for every
+failure. A real key that fails because Gemini is unreachable, rate-limited,
+or having an outage used to read identically to a genuinely bad key, which
+made a live deploy issue indistinguishable from a typo; only an HTTP
+4xx from Gemini itself (bad/revoked key, or a request Gemini itself
+rejects) is reported as `invalid_key` now. Every branch logs the
+exception's *type and status code only* (never `str(exc)`, which is the
+one piece of this SDK's own error message that could echo request
+internals) so a real production failure is diagnosable from server logs
+without the frontend or this response ever carrying more detail than a
+generic reason string.
 """
 
 from __future__ import annotations
 
+import structlog
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
@@ -21,6 +35,7 @@ from app.agents.llm_client import GeminiClient, LLMClient
 from app.security import ProviderKey, get_provider_key
 
 router = APIRouter()
+logger = structlog.get_logger("oocc.api")
 
 _VALIDATION_SCHEMA = {
     "type": "object",
@@ -57,7 +72,31 @@ async def validate_key(
             response_schema=_VALIDATION_SCHEMA,
             thinking_budget=0,
         )
-    except Exception:  # noqa: BLE001 — any failure (bad key, network, quota) reads as "invalid"
-        return ValidateKeyResponse(valid=False, error="invalid_key")
+    except Exception as exc:  # noqa: BLE001 — every failure path logs+reports below, none re-raise
+        # Imported lazily, matching `GeminiClient.__init__`'s own reasoning
+        # (app/agents/llm_client.py) — this module shouldn't force a
+        # google-genai import just to be collected by a FakeLLMClient-only
+        # test.
+        from google.genai.errors import ClientError
+
+        if isinstance(exc, ClientError) and exc.code == 429:
+            error = "rate_limited"
+        elif isinstance(exc, ClientError):
+            # Any other 4xx from Gemini itself: bad/revoked key, or a
+            # request Gemini rejects outright — the only case a real,
+            # working key should never land in.
+            error = "invalid_key"
+        else:
+            # Network failure, 5xx, timeout — Gemini/the network is the
+            # problem, not necessarily the key.
+            error = "upstream_unavailable"
+
+        logger.warning(
+            "settings.validate_key_failed",
+            error=error,
+            exception_type=type(exc).__name__,
+            status_code=getattr(exc, "code", None),
+        )
+        return ValidateKeyResponse(valid=False, error=error)
 
     return ValidateKeyResponse(valid=True, tokens_used=client.last_usage_tokens)

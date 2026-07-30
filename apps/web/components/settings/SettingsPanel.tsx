@@ -19,6 +19,25 @@ const STATUS_TONE: Record<KeyStatus, "neutral" | "ok" | "warn" | "signal"> = {
   invalid: "warn",
 };
 
+/** `error` on the store is whatever `POST /api/settings/validate-key`
+ * reported (see apps/api/app/routers/settings.py's own docstring for the
+ * full list) plus two client-only codes (`network_error`, and the
+ * shape-check message from `looksLikeAKey`) — mapped here to copy that
+ * tells a real bad key apart from Gemini/the network being the problem,
+ * so "I pasted a working key and it says invalid" isn't the same bug
+ * report as "Gemini is rate-limiting me" or "the backend is unreachable." */
+const ERROR_COPY: Record<string, string> = {
+  invalid_key: "Gemini rejected this key. Double-check you copied the whole thing.",
+  rate_limited: "Gemini is rate-limiting this key right now — try again shortly.",
+  upstream_unavailable: "Couldn't reach Gemini to check the key. Try again shortly.",
+  network_error: "Couldn't reach the OOCC backend to check the key.",
+  no_key: "No key was sent.",
+};
+
+function describeError(error: string): string {
+  return ERROR_COPY[error] ?? error;
+}
+
 /**
  * Key setup (docs/PRD.md §4.5, Phase 3 frontend spec item 1): an anchored
  * dropdown from the top bar, not a modal — the app is fully usable with it
@@ -104,7 +123,7 @@ export function SettingsPanel() {
           </div>
 
           {status === "invalid" && error ? (
-            <p className="mt-1.5 font-mono-label text-[11px] text-warn">{error}</p>
+            <p className="mt-1.5 font-mono-label text-[11px] text-warn">{describeError(error)}</p>
           ) : null}
 
           <div
