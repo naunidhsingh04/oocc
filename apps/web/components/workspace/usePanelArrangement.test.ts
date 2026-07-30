@@ -83,6 +83,31 @@ describe("usePanelArrangement", () => {
     expect(ids).toContain("local-2");
   });
 
+  it("repairs an already-corrupted stored arrangement instead of crashing on load", () => {
+    // A browser that hit the collision bug *before* the fix above has a
+    // real duplicate-id arrangement already sitting in its own
+    // localStorage — restoring it verbatim would reproduce the exact same
+    // `react-resizable-panels` crash on the very next page load, with no
+    // `addPanel` call involved. This is the recovery path for that
+    // already-corrupted data, not just prevention of new corruption.
+    window.localStorage.setItem(
+      "oocc.panel-arrangement.corrupt-key",
+      JSON.stringify({
+        panels: [
+          { id: "p1", type: "array", binding: "o1", role: "primary" },
+          { id: "local-1", type: "console", role: "secondary" },
+          { id: "local-1", type: "stack", role: "secondary" },
+        ],
+      }),
+    );
+
+    const { result } = renderHook(() => usePanelArrangement(PLAN, "corrupt-key"));
+    const ids = result.current.panels.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(result.current.panels).toHaveLength(3);
+    expect(result.current.panels.map((p) => p.type)).toEqual(["array", "console", "stack"]);
+  });
+
   it("clears maximizedId when the maximized panel is removed", () => {
     const { result } = renderHook(() => usePanelArrangement(PLAN, "test-key-3"));
     act(() => result.current.setMaximizedId("p1"));

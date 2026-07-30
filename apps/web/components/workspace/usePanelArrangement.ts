@@ -59,6 +59,38 @@ function nextLocalPanelId(panels: PlanPanelNode[]): string {
 }
 
 /**
+ * Repairs an already-corrupted stored arrangement, not just prevents new
+ * corruption. A browser that hit the collision bug above *before* this fix
+ * shipped has a real duplicate-id arrangement sitting in its own
+ * `localStorage` right now — restoring it verbatim reproduces the exact
+ * same crash on load, with no `addPanel` call involved at all.
+ * `nextLocalPanelId` alone doesn't fix that: it only guards ids handed out
+ * *after* this ran. Any panel whose id has already appeared earlier in the
+ * list gets reassigned a fresh one instead.
+ */
+function dedupePanelIds(panels: PlanPanelNode[]): PlanPanelNode[] {
+  const seen = new Set<string>();
+  let maxLocal = 0;
+  for (const p of panels) {
+    const match = /^local-(\d+)$/.exec(p.id);
+    if (match) maxLocal = Math.max(maxLocal, Number(match[1]));
+  }
+  let changed = false;
+  const result = panels.map((p) => {
+    if (!seen.has(p.id)) {
+      seen.add(p.id);
+      return p;
+    }
+    changed = true;
+    maxLocal += 1;
+    const freshId = `local-${maxLocal}`;
+    seen.add(freshId);
+    return { ...p, id: freshId };
+  });
+  return changed ? result : panels;
+}
+
+/**
  * Owns the mutable, user-editable panel arrangement for one loaded
  * trace: seeded from viz_planner's plan, then add/remove/retype are
  * applied on top and persisted to localStorage keyed by `storageKey`
@@ -69,7 +101,9 @@ function nextLocalPanelId(panels: PlanPanelNode[]): string {
 export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   const seedPlan = plan ?? DEFAULT_PLAN;
 
-  const [panels, setPanels] = useState<PlanPanelNode[]>(() => loadStored(storageKey)?.panels ?? seedPlan.panels);
+  const [panels, setPanels] = useState<PlanPanelNode[]>(() =>
+    dedupePanelIds(loadStored(storageKey)?.panels ?? seedPlan.panels),
+  );
   const [maximizedId, setMaximizedId] = useState<string | null>(null);
 
   // Re-seed whenever the underlying run changes, not on every plan object
@@ -80,7 +114,7 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   useEffect(() => {
     const stored = loadStored(storageKey);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPanels(stored?.panels ?? seedPlan.panels);
+    setPanels(dedupePanelIds(stored?.panels ?? seedPlan.panels));
     setMaximizedId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
