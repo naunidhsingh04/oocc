@@ -18,6 +18,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
 from app.auth.tokens import SESSION_COOKIE_NAME
+from app.env_checks import check_production_config
 from app.logging import bind_sensitive_value, configure_logging
 from app.routers.auth import router as auth_router
 from app.routers.problems import router as problems_router
@@ -46,6 +47,11 @@ cors_origins = [
     for origin in os.environ.get("CORS_ORIGINS", _DEFAULT_CORS_ORIGINS).split(",")
     if origin.strip()
 ]
+
+# Raises (refusing to start) if ENVIRONMENT=production and either
+# SESSION_SECRET or CORS_ORIGINS is still at an insecure/missing default —
+# see app/env_checks.py. No-op in dev/tests (ENVIRONMENT unset).
+check_production_config(cors_origins=cors_origins)
 
 app.add_middleware(
     CORSMiddleware,

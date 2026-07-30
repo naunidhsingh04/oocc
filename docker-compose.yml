@@ -82,13 +82,13 @@ services:
     mem_limit: 256m
     cpus: 0.5
     pids_limit: 32
-    # 65534 is the conventional "nobody" uid/gid on Debian-family images
-    # (this Dockerfile's `python:3.12-slim` base) — non-root, per §5.
-    # Flagged for extra scrutiny before deploying: `COPY . .` in the
-    # Dockerfile copies the repo as whatever the build step's default
-    # ownership is, and this hasn't been runtime-verified to confirm uid
-    # 65534 can actually read its own application files inside the image.
-    user: "65534:65534"
+    # The Dockerfile itself now creates a dedicated oocc:oocc (1000:1000)
+    # user and `chown`s the app files to it at build time, so this no
+    # longer needs (or should) override to a different uid — a mismatched
+    # override here would reintroduce the exact "can this uid actually
+    # read its own files" gap this comment used to flag before the
+    # Dockerfile chowned anything at all.
+    user: "1000:1000"
 
   web:
     build:
