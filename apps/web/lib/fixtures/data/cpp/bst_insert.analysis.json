@@ -1,0 +1,10 @@
+{
+  "structures": [
+    {
+      "kind": "binary_tree",
+      "root_ref": "o2",
+      "confidence": 0.95
+    }
+  ],
+  "insights": []
+}

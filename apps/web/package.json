@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:fixtures-data": "node scripts/sync-fixtures-data.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.9.1",

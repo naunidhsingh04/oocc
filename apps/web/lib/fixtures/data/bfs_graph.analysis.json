@@ -1,0 +1,21 @@
+{
+  "structures": [
+    {
+      "kind": "graph",
+      "root_ref": "o1",
+      "confidence": 0.85
+    },
+    {
+      "kind": "array",
+      "root_ref": "o10",
+      "confidence": 0.6
+    },
+    {
+      "kind": "queue",
+      "root_ref": "o11",
+      "confidence": 0.85
+    }
+  ],
+  "insights": [],
+  "complexity": null
+}

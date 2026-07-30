@@ -1,0 +1,512 @@
+{
+  "structures": [
+    {
+      "kind": "array_2d",
+      "root_ref": "o3",
+      "confidence": 0.8
+    },
+    {
+      "kind": "stack",
+      "root_ref": "o4",
+      "confidence": 0.85
+    }
+  ],
+  "insights": [
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        5,
+        16,
+        45,
+        99,
+        126,
+        182,
+        246,
+        270,
+        330,
+        373
+      ],
+      "detail": "solve called with identical arguments 54 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        21,
+        574,
+        1153,
+        1604,
+        2183
+      ],
+      "detail": "is_safe called with identical arguments 5 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        28,
+        582,
+        1360,
+        1942,
+        2305
+      ],
+      "detail": "is_safe called with identical arguments 5 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        36,
+        589,
+        1368,
+        2146,
+        2506
+      ],
+      "detail": "is_safe called with identical arguments 5 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        50,
+        251,
+        452,
+        611,
+        815,
+        1167,
+        1397,
+        1618,
+        1956,
+        2197
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        57,
+        258,
+        459,
+        761,
+        957,
+        1175,
+        1405,
+        1628,
+        1967,
+        2207
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        68,
+        406,
+        528,
+        768,
+        964,
+        1186,
+        1561,
+        1636,
+        1975,
+        2218
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        76,
+        414,
+        536,
+        779,
+        1118,
+        1193,
+        1568,
+        1790,
+        1986,
+        2226
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        87,
+        424,
+        547,
+        787,
+        1126,
+        1349,
+        1579,
+        1797,
+        1993,
+        2295
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        104,
+        275,
+        476,
+        628,
+        832,
+        981,
+        1210,
+        1422,
+        1653,
+        1814
+      ],
+      "detail": "is_safe called with identical arguments 14 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        111,
+        282,
+        483,
+        641,
+        845,
+        1075,
+        1220,
+        1436,
+        1661,
+        1822
+      ],
+      "detail": "is_safe called with identical arguments 14 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        131,
+        335,
+        668,
+        883,
+        1001,
+        1240,
+        1476,
+        1713,
+        1842,
+        2048
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        138,
+        342,
+        679,
+        896,
+        1015,
+        1250,
+        1503,
+        1723,
+        1852,
+        2075
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        154,
+        355,
+        686,
+        903,
+        1022,
+        1264,
+        1514,
+        1750,
+        1868,
+        2085
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        164,
+        382,
+        700,
+        917,
+        1035,
+        1271,
+        1521,
+        1763,
+        1882,
+        2099
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        191,
+        392,
+        710,
+        933,
+        1062,
+        1282,
+        1535,
+        1770,
+        1889,
+        2106
+      ],
+      "detail": "is_safe called with identical arguments 12 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        202,
+        293,
+        496,
+        648,
+        852,
+        1082,
+        1312,
+        1449,
+        1675,
+        1905
+      ],
+      "detail": "is_safe called with identical arguments 14 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        212,
+        307,
+        507,
+        740,
+        863,
+        1093,
+        1319,
+        1456,
+        1686,
+        1916
+      ],
+      "detail": "is_safe called with identical arguments 14 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        220,
+        315,
+        515,
+        750,
+        946,
+        1107,
+        1332,
+        1548,
+        1693,
+        1923
+      ],
+      "detail": "is_safe called with identical arguments 14 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        237,
+        597,
+        1375,
+        2154,
+        2707
+      ],
+      "detail": "is_safe called with identical arguments 5 times"
+    },
+    {
+      "kind": "redundant_recomputation",
+      "severity": "warning",
+      "step_refs": [
+        438,
+        801,
+        1383,
+        2161,
+        2715
+      ],
+      "detail": "is_safe called with identical arguments 5 times"
+    }
+  ],
+  "complexity": {
+    "parameter": "columns",
+    "samples": [
+      {
+        "n": 10,
+        "shape": "random",
+        "step_count": 7
+      },
+      {
+        "n": 50,
+        "shape": "random",
+        "step_count": 7
+      },
+      {
+        "n": 100,
+        "shape": "random",
+        "step_count": 7
+      },
+      {
+        "n": 500,
+        "shape": "random",
+        "step_count": 7
+      },
+      {
+        "n": 1000,
+        "shape": "random",
+        "step_count": 7
+      },
+      {
+        "n": 10,
+        "shape": "sorted",
+        "step_count": 7
+      },
+      {
+        "n": 50,
+        "shape": "sorted",
+        "step_count": 7
+      },
+      {
+        "n": 100,
+        "shape": "sorted",
+        "step_count": 7
+      },
+      {
+        "n": 500,
+        "shape": "sorted",
+        "step_count": 7
+      },
+      {
+        "n": 1000,
+        "shape": "sorted",
+        "step_count": 7
+      },
+      {
+        "n": 10,
+        "shape": "reverse",
+        "step_count": 7
+      },
+      {
+        "n": 50,
+        "shape": "reverse",
+        "step_count": 7
+      },
+      {
+        "n": 100,
+        "shape": "reverse",
+        "step_count": 7
+      },
+      {
+        "n": 500,
+        "shape": "reverse",
+        "step_count": 7
+      },
+      {
+        "n": 1000,
+        "shape": "reverse",
+        "step_count": 7
+      },
+      {
+        "n": 10,
+        "shape": "all_equal",
+        "step_count": 7
+      },
+      {
+        "n": 50,
+        "shape": "all_equal",
+        "step_count": 7
+      },
+      {
+        "n": 100,
+        "shape": "all_equal",
+        "step_count": 7
+      },
+      {
+        "n": 500,
+        "shape": "all_equal",
+        "step_count": 7
+      },
+      {
+        "n": 1000,
+        "shape": "all_equal",
+        "step_count": 7
+      }
+    ],
+    "fits": [
+      {
+        "model": "constant",
+        "r_squared": 1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 7.0
+        }
+      },
+      {
+        "model": "log_n",
+        "r_squared": 1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 7.0
+        }
+      },
+      {
+        "model": "n",
+        "r_squared": 1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 7.0
+        }
+      },
+      {
+        "model": "n_log_n",
+        "r_squared": 1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 7.0
+        }
+      },
+      {
+        "model": "n_squared",
+        "r_squared": 1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 7.0
+        }
+      },
+      {
+        "model": "n_cubed",
+        "r_squared": 1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 7.0
+        }
+      },
+      {
+        "model": "exponential",
+        "r_squared": -1.0,
+        "coefficients": {
+          "a": 0.0,
+          "b": 0.0
+        }
+      }
+    ],
+    "best_fit": "constant"
+  }
+}

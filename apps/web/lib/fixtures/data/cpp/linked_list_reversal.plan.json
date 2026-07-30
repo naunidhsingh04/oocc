@@ -1,0 +1,26 @@
+{
+  "layout": "primary+stack",
+  "panels": [
+    {
+      "id": "p1",
+      "type": "linked_list",
+      "binding": "o5",
+      "role": "primary"
+    },
+    {
+      "id": "p2",
+      "type": "call_stack",
+      "role": "secondary"
+    },
+    {
+      "id": "p3",
+      "type": "variables",
+      "role": "secondary"
+    },
+    {
+      "id": "p4",
+      "type": "console",
+      "role": "secondary"
+    }
+  ]
+}

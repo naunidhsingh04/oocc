@@ -1,0 +1,16 @@
+{
+  "structures": [
+    {
+      "kind": "array",
+      "root_ref": "o2",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o3",
+      "confidence": 0.6
+    }
+  ],
+  "insights": [],
+  "complexity": null
+}

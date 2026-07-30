@@ -1,0 +1,10 @@
+{
+  "structures": [
+    {
+      "kind": "linked_list",
+      "root_ref": "o5",
+      "confidence": 0.9
+    }
+  ],
+  "insights": []
+}
