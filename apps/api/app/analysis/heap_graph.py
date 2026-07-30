@@ -39,9 +39,7 @@ def is_none_value(value: dict[str, Any] | None) -> bool:
     return isinstance(value, dict) and "val" in value and value["val"] is None
 
 
-def heap_object_length_history(
-    trace: dict[str, Any], oid: str
-) -> list[tuple[int, list[Any]]]:
+def heap_object_length_history(trace: dict[str, Any], oid: str) -> list[tuple[int, list[Any]]]:
     """Every (step_i, items) observation of a list/tuple/set heap object,
     in step order, wherever it appears in that step's heap. Used for
     access-pattern classification (stack/queue) in structure_detector and

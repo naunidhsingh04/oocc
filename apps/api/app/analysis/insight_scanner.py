@@ -108,9 +108,7 @@ def _detect_off_by_one(trace: dict[str, Any]) -> list[dict[str, Any]]:
 # -- mutation during iteration -----------------------------------------------
 
 
-def _detect_mutation_during_iteration(
-    trace: dict[str, Any], source: str
-) -> list[dict[str, Any]]:
+def _detect_mutation_during_iteration(trace: dict[str, Any], source: str) -> list[dict[str, Any]]:
     """Only `for x in container:` (direct iteration) is the risky pattern
     PRD §4.3 means — mutating the sequence you're walking element-by-element
     can skip or repeat items. `for i in range(len(container)): container[i]`

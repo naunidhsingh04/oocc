@@ -117,7 +117,7 @@ class ChangedPath(RootModel[str]):
 class Op(StrEnum):
     add = 'add'
     remove = 'remove'
-    replace = 'replace'
+    replace_ = 'replace'
 
 
 class JsonPatchOp(BaseModel):

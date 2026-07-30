@@ -90,9 +90,7 @@ def test_tutor_with_a_key_streams_chunks_then_a_done_event_with_step_refs() -> N
 def test_signed_in_users_token_spend_is_recorded_and_viewable() -> None:
     trace = _trace("binary_search")
     real_step = trace["steps"][2]["i"]
-    llm_client = FakeLLMClient(
-        json_responses=[{"answer": "answer", "step_refs": [real_step]}]
-    )
+    llm_client = FakeLLMClient(json_responses=[{"answer": "answer", "step_refs": [real_step]}])
     fake_user = User(
         id="u_test", handle="tester", email=None, github_id=None, created_at=datetime.now(UTC)
     )

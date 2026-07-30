@@ -135,6 +135,29 @@ function freezeRootModels(source, names) {
   return result;
 }
 
+// Every StrEnum member name is also a class attribute on a `str` subclass,
+// so a member named after one of `str`'s own methods (e.g. `replace`)
+// creates an attribute whose type (the enum member) is incompatible with
+// the inherited method's type — a real mypy --strict error, not a false
+// positive. datamodel-codegen already renames members that collide with a
+// Python *keyword* (`return` -> `return_`, visible below as `StepEvent`'s
+// `return_`); this extends the identical convention to members that
+// collide with a `str` *method* name instead, since datamodel-codegen has
+// no reason to know about those. Only the Python identifier changes — the
+// enum member's own string *value* (what actually round-trips over the
+// wire) is untouched.
+const STR_METHOD_NAMES = new Set(
+  Object.getOwnPropertyNames(String.prototype).filter((name) => /^[a-z]/.test(name)),
+);
+
+function renameStrMethodCollidingEnumMembers(source) {
+  return source.replace(
+    /^(    )([a-zA-Z_][a-zA-Z0-9_]*)( = (['"]).*?\4)$/gm,
+    (line, indent, name, valuePart) =>
+      STR_METHOD_NAMES.has(name) ? `${indent}${name}_${valuePart}` : line,
+  );
+}
+
 async function generatePython() {
   const outDir = resolve(contractsDir, "python/src/oocc_contracts/generated");
   await mkdir(outDir, { recursive: true });
@@ -184,10 +207,12 @@ async function generatePython() {
       { cwd: repoRoot, stdio: "inherit" },
     );
 
+    let generated = await readFile(outPath, "utf8");
+    generated = renameStrMethodCollidingEnumMembers(generated);
     if (frozenRootModels?.length) {
-      const generated = await readFile(outPath, "utf8");
-      await writeFile(outPath, freezeRootModels(generated, frozenRootModels));
+      generated = freezeRootModels(generated, frozenRootModels);
     }
+    await writeFile(outPath, generated);
     console.log(`[gen:contracts] wrote python/src/oocc_contracts/generated/${pyModule}.py`);
   }
 

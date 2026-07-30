@@ -65,8 +65,7 @@ def _restricted_import(
     if top_level not in ALLOWED_MODULES:
         allowed = ", ".join(sorted(ALLOWED_MODULES))
         raise SandboxImportError(
-            f"import of '{name}' isn't allowed here. OOCC's Python sandbox only "
-            f"allows: {allowed}."
+            f"import of '{name}' isn't allowed here. OOCC's Python sandbox only allows: {allowed}."
         )
     return _builtins_module.__import__(name, globals, locals, fromlist, level)
 

@@ -29,19 +29,22 @@ def test_disallowed_modules_fail_safely(module_name: str) -> None:
     assert module_name in trace["error"]["message"]
 
 
-@pytest.mark.parametrize("source", [
-    "import math\nprint(math.sqrt(4))\n",
-    "import random\nprint(random.randint(0, 10))\n",
-    "import collections\nprint(collections.Counter('aab'))\n",
-    "import heapq\nprint(heapq.nsmallest(1, [3, 1, 2]))\n",
-    "import bisect\nprint(bisect.bisect([1, 2, 3], 2))\n",
-    "import itertools\nprint(list(itertools.islice(itertools.count(), 3)))\n",
-    "import functools\nprint(functools.reduce(lambda a, b: a + b, [1, 2, 3]))\n",
-    "import string\nprint(string.ascii_lowercase[:3])\n",
-    "import typing\nprint(typing.List)\n",
-    "import dataclasses\nprint(dataclasses.field)\n",
-    "import re\nprint(re.match(r'a+', 'aaa'))\n",
-])
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import math\nprint(math.sqrt(4))\n",
+        "import random\nprint(random.randint(0, 10))\n",
+        "import collections\nprint(collections.Counter('aab'))\n",
+        "import heapq\nprint(heapq.nsmallest(1, [3, 1, 2]))\n",
+        "import bisect\nprint(bisect.bisect([1, 2, 3], 2))\n",
+        "import itertools\nprint(list(itertools.islice(itertools.count(), 3)))\n",
+        "import functools\nprint(functools.reduce(lambda a, b: a + b, [1, 2, 3]))\n",
+        "import string\nprint(string.ascii_lowercase[:3])\n",
+        "import typing\nprint(typing.List)\n",
+        "import dataclasses\nprint(dataclasses.field)\n",
+        "import re\nprint(re.match(r'a+', 'aaa'))\n",
+    ],
+)
 def test_allowed_modules_still_work(source: str) -> None:
     trace = Tracer().run(source)
     assert trace["status"] == "ok"
