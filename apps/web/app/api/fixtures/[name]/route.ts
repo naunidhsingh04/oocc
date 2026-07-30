@@ -7,11 +7,19 @@ import { CPP_FIXTURE_NAMES, isFixtureName } from "@/lib/fixtures";
 // apps/web/app/api/fixtures/[name] -> repo root is six levels up.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
+// Serves the committed fixtures/**.json + program source directly — used
+// by the landing page demo, curriculum's EmbeddedTrace, Compare, the dev
+// FixturePicker, and problem visualization (lib/fixtures.ts's callers).
+// This used to 404 outside `next dev` on the theory that it was a
+// throwaway stand-in for a real run API — but nothing ever replaced it,
+// so every one of those surfaces was silently broken on a production
+// deploy (e.g. Vercel). The data itself (committed, static, non-
+// sensitive) is perfectly fine to serve in production; the only actual
+// production gap was Vercel's build-time file tracer not knowing to
+// bundle fixtures/** for this route, since the paths below are computed
+// at runtime rather than statically imported — see
+// `outputFileTracingIncludes` in next.config.ts, which fixes that.
 export async function GET(_request: Request, context: { params: Promise<{ name: string }> }) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
-
   const { name } = await context.params;
   if (!isFixtureName(name)) {
     return NextResponse.json({ error: `unknown fixture "${name}"` }, { status: 404 });

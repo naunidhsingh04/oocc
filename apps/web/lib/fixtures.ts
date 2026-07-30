@@ -57,8 +57,9 @@ export interface FixtureBundle {
 }
 
 /**
- * Fetches a fixture's trace + source + analysis + plan via the dev-only
- * Next.js route handler. This return shape deliberately matches what
+ * Fetches a fixture's trace + source + analysis + plan via
+ * `/api/fixtures/[name]` — served in both dev and production (see that
+ * route's own docstring). This return shape deliberately matches what
  * `POST /api/runs` returns (apps/api/app/routers/runs.py) — swapping the
  * transport for the real API later is a one-line change in this function,
  * not a shape change at every call site.
