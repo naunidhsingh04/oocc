@@ -66,10 +66,39 @@ def _bundled_libclang_path() -> str | None:
     return None
 
 
+def _wasi_sdk_libclang_path() -> str | None:
+    """The wasi-sdk release itself ships its own libclang — the exact same
+    LLVM build as the `clang++` that actually compiles instrumented output
+    (`toolchain.py`'s `compile_to_wasm`), unlike the separately-versioned
+    `libclang` PyPI wheel `_bundled_libclang_path` above returns (capped at
+    18.1.1 — no newer release exists on PyPI as of this writing). Found for
+    real setting this up fresh: wasi-sdk 33's own libc++ headers use
+    `__builtin_clzg`/`__builtin_ctzg` (added in a Clang newer than 18.1.1
+    recognizes) inside `<bit>`'s always-parsed helpers, reached transitively
+    through `<vector>`/`<unordered_map>` — and every real instrumented
+    program includes those via oocc's own runtime headers, so the 18.1.1
+    wheel can't parse *any* real program's wasi-sdk-targeted args once the
+    two versions drift this far apart, not just an edge case. Preferring
+    this path over the PyPI wheel whenever the SDK is installed keeps
+    parser and compiler on the literal same LLVM build, which is a
+    strictly tighter version of the "parse time and compile time must
+    agree" invariant this module's own docstring already states — verified
+    directly: the PyPI wheel fails to parse a bare `#include <vector>`
+    against wasi-sdk 33's sysroot, this path parses it clean."""
+    from .toolchain import WASI_SDK_DIR
+
+    for rel in ("bin/libclang.dll", "bin/libclang.dylib", "lib/libclang.dylib", "lib/libclang.so"):
+        candidate = WASI_SDK_DIR / rel
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
 def _ensure_libclang_configured() -> None:
     if ci.Config.loaded:
         return
     candidates = [
+        _wasi_sdk_libclang_path(),
         _bundled_libclang_path(),
         "/Library/Developer/CommandLineTools/usr/lib/libclang.dylib",
         "/usr/lib/llvm-14/lib/libclang.so",

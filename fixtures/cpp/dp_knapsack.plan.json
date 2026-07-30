@@ -1,0 +1,86 @@
+{
+  "layout": "primary+stack",
+  "panels": [
+    {
+      "id": "p1",
+      "type": "array_2d",
+      "binding": "o10",
+      "role": "primary"
+    },
+    {
+      "id": "p2",
+      "type": "array",
+      "binding": "o2",
+      "role": "secondary"
+    },
+    {
+      "id": "p3",
+      "type": "array",
+      "binding": "o6",
+      "role": "secondary"
+    },
+    {
+      "id": "p4",
+      "type": "array",
+      "binding": "o11",
+      "role": "secondary"
+    },
+    {
+      "id": "p5",
+      "type": "array",
+      "binding": "o17",
+      "role": "secondary"
+    },
+    {
+      "id": "p6",
+      "type": "array",
+      "binding": "o26",
+      "role": "secondary"
+    },
+    {
+      "id": "p7",
+      "type": "array",
+      "binding": "o24",
+      "role": "secondary"
+    },
+    {
+      "id": "p8",
+      "type": "array",
+      "binding": "o35",
+      "role": "secondary"
+    },
+    {
+      "id": "p9",
+      "type": "array",
+      "binding": "o32",
+      "role": "secondary"
+    },
+    {
+      "id": "p10",
+      "type": "array",
+      "binding": "o34",
+      "role": "secondary"
+    },
+    {
+      "id": "p11",
+      "type": "array",
+      "binding": "o42",
+      "role": "secondary"
+    },
+    {
+      "id": "p12",
+      "type": "call_stack",
+      "role": "secondary"
+    },
+    {
+      "id": "p13",
+      "type": "variables",
+      "role": "secondary"
+    },
+    {
+      "id": "p14",
+      "type": "console",
+      "role": "secondary"
+    }
+  ]
+}

@@ -82,6 +82,7 @@ output: indices: [0, 1]
 \`\`\`
 (\`nums[0] + nums[1] == 2 + 7 == 9\`)`,
     fixturePython: "two_sum",
+    fixtureCpp: "two_sum_cpp",
     starterPython: `def two_sum(nums, target):
     seen = {}
     for i, num in enumerate(nums):
@@ -97,6 +98,41 @@ target = int(input())
 
 result = two_sum(nums, target)
 print("indices:", result)
+`,
+    starterCpp: `#include <iostream>
+#include <unordered_map>
+#include <vector>
+
+std::vector<int> two_sum(std::vector<int>& nums, int target) {
+    std::unordered_map<int, int> seen;
+    for (int i = 0; i < static_cast<int>(nums.size()); i = i + 1) {
+        int complement = target - nums[i];
+        if (seen.count(complement) > 0) {
+            std::vector<int> result;
+            result.push_back(seen[complement]);
+            result.push_back(i);
+            return result;
+        }
+        seen[nums[i]] = i;
+    }
+    return std::vector<int>();
+}
+
+int main() {
+    std::vector<int> nums;
+    nums.push_back(2);
+    nums.push_back(7);
+    nums.push_back(11);
+    nums.push_back(15);
+    nums.push_back(3);
+    int target = 9;
+
+    std::vector<int> result = two_sum(nums, target);
+
+    std::cout << "indices: [" << result[0] << ", " << result[1] << "]\\n";
+
+    return 0;
+}
 `,
     testCases: [{ input: "2 7 11 15 3\n9", expectedOutput: "indices: [0, 1]" }],
   },
@@ -204,6 +240,7 @@ int main() {
 
 Open the recursion tree panel in Visualize — the call pattern for naive recursive Fibonacci is the textbook example of overlapping subproblems (the same \`fib(2)\` gets recomputed many times), which is exactly the motivation for memoization.`,
     fixturePython: "fibonacci_recursion",
+    fixtureCpp: "fibonacci_recursion_cpp",
     starterPython: `def fib(n):
     if n < 2:
         return n
@@ -212,6 +249,22 @@ Open the recursion tree panel in Visualize — the call pattern for naive recurs
 
 for i in range(8):
     print(f"fib({i}) =", fib(i))
+`,
+    starterCpp: `#include <iostream>
+
+int fib(int n) {
+    if (n < 2) {
+        return n;
+    }
+    return fib(n - 1) + fib(n - 2);
+}
+
+int main() {
+    for (int i = 0; i < 8; i = i + 1) {
+        std::cout << "fib(" << i << ") = " << fib(i) << "\\n";
+    }
+    return 0;
+}
 `,
     testCases: [
       {
@@ -484,6 +537,7 @@ int main() {
 
 Watch \`i\`/\`j\` sweep through the array in the array panel — partitioning is the one place in the whole curriculum where two index variables' relative motion tells the entire story.`,
     fixturePython: "quicksort_partition",
+    fixtureCpp: "quicksort_partition_cpp",
     starterPython: `def partition(arr, low, high):
     pivot = arr[high]
     i = low - 1
@@ -506,6 +560,58 @@ numbers = [8, 3, 7, 4, 2, 9, 1]
 quicksort(numbers, 0, len(numbers) - 1)
 print("sorted:", numbers)
 `,
+    starterCpp: `#include <iostream>
+#include <vector>
+
+int partition(std::vector<int>& arr, int low, int high) {
+    int pivot = arr[high];
+    int i = low - 1;
+    for (int j = low; j < high; j = j + 1) {
+        if (arr[j] <= pivot) {
+            i = i + 1;
+            int tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+        }
+    }
+    int tmp = arr[i + 1];
+    arr[i + 1] = arr[high];
+    arr[high] = tmp;
+    return i + 1;
+}
+
+void quicksort(std::vector<int>& arr, int low, int high) {
+    if (low < high) {
+        int pivot_index = partition(arr, low, high);
+        quicksort(arr, low, pivot_index - 1);
+        quicksort(arr, pivot_index + 1, high);
+    }
+}
+
+int main() {
+    std::vector<int> numbers;
+    numbers.push_back(8);
+    numbers.push_back(3);
+    numbers.push_back(7);
+    numbers.push_back(4);
+    numbers.push_back(2);
+    numbers.push_back(9);
+    numbers.push_back(1);
+
+    quicksort(numbers, 0, static_cast<int>(numbers.size()) - 1);
+
+    std::cout << "sorted: [";
+    for (int i = 0; i < static_cast<int>(numbers.size()); i = i + 1) {
+        std::cout << numbers[i];
+        if (i + 1 < static_cast<int>(numbers.size())) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]\\n";
+
+    return 0;
+}
+`,
     testCases: [{ input: "", expectedOutput: "sorted: [1, 2, 3, 4, 7, 8, 9]" }],
   },
   {
@@ -519,6 +625,7 @@ print("sorted:", numbers)
 
 The recursion tree panel is the point here: every dead-end branch (a queen placement that turns out unsafe) shows up as a subtree that gets abandoned — backtracking made visible instead of just asserted in prose.`,
     fixturePython: "n_queens",
+    fixtureCpp: "n_queens_cpp",
     starterPython: `def is_safe(columns, row, col):
     for placed_row, placed_col in enumerate(columns):
         if placed_col == col:
@@ -546,6 +653,65 @@ solve(n, [], solutions)
 print(f"{n}-queens solutions:", len(solutions))
 print("first solution:", solutions[0])
 `,
+    starterCpp: `#include <iostream>
+#include <vector>
+
+int abs_int(int x) {
+    if (x < 0) {
+        return -x;
+    }
+    return x;
+}
+
+bool is_safe(std::vector<int>& columns, int row, int col) {
+    for (int placed_row = 0; placed_row < static_cast<int>(columns.size()); placed_row = placed_row + 1) {
+        int placed_col = columns[placed_row];
+        if (placed_col == col) {
+            return false;
+        }
+        if (abs_int(placed_col - col) == abs_int(placed_row - row)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void solve(int n, std::vector<int>& columns, std::vector<std::vector<int>>& solutions) {
+    int row = static_cast<int>(columns.size());
+    if (row == n) {
+        solutions.push_back(columns);
+        return;
+    }
+    for (int col = 0; col < n; col = col + 1) {
+        if (is_safe(columns, row, col)) {
+            columns.push_back(col);
+            solve(n, columns, solutions);
+            columns.pop_back();
+        }
+    }
+}
+
+int main() {
+    int n = 5;
+    std::vector<int> columns;
+    std::vector<std::vector<int>> solutions;
+    solve(n, columns, solutions);
+
+    std::cout << n << "-queens solutions: " << solutions.size() << "\\n";
+
+    std::cout << "first solution: [";
+    std::vector<int>& first = solutions[0];
+    for (int i = 0; i < static_cast<int>(first.size()); i = i + 1) {
+        std::cout << first[i];
+        if (i + 1 < static_cast<int>(first.size())) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << "]\\n";
+
+    return 0;
+}
+`,
     testCases: [{ input: "", expectedOutput: "5-queens solutions: 10\nfirst solution: [0, 2, 4, 1, 3]" }],
   },
   {
@@ -559,6 +725,7 @@ print("first solution:", solutions[0])
 
 The DP table panel renders \`table\` as a growing 2D grid; scrub it and watch each cell get filled from the two cells that determine it (\`table[i-1][w]\` and \`table[i-1][w - weight]\`) — the recurrence made literal.`,
     fixturePython: "dp_knapsack",
+    fixtureCpp: "dp_knapsack_cpp",
     starterPython: `def knapsack(weights, values, capacity):
     n = len(weights)
     table = [[0] * (capacity + 1) for _ in range(n + 1)]
@@ -581,6 +748,61 @@ capacity = 8
 
 best_value = knapsack(weights, values, capacity)
 print("best value:", best_value)
+`,
+    starterCpp: `#include <iostream>
+#include <vector>
+
+int knapsack(std::vector<int>& weights, std::vector<int>& values, int capacity) {
+    int n = static_cast<int>(weights.size());
+    std::vector<std::vector<int>> table;
+    for (int i = 0; i <= n; i = i + 1) {
+        std::vector<int> row;
+        for (int w = 0; w <= capacity; w = w + 1) {
+            row.push_back(0);
+        }
+        table.push_back(row);
+    }
+
+    for (int i = 1; i <= n; i = i + 1) {
+        for (int w = 0; w <= capacity; w = w + 1) {
+            int without_item = table[i - 1][w];
+            if (weights[i - 1] <= w) {
+                int with_item = values[i - 1] + table[i - 1][w - weights[i - 1]];
+                if (with_item > without_item) {
+                    table[i][w] = with_item;
+                } else {
+                    table[i][w] = without_item;
+                }
+            } else {
+                table[i][w] = without_item;
+            }
+        }
+    }
+
+    return table[n][capacity];
+}
+
+int main() {
+    std::vector<int> weights;
+    weights.push_back(2);
+    weights.push_back(3);
+    weights.push_back(4);
+    weights.push_back(5);
+
+    std::vector<int> values;
+    values.push_back(3);
+    values.push_back(4);
+    values.push_back(5);
+    values.push_back(6);
+
+    int capacity = 8;
+
+    int best_value = knapsack(weights, values, capacity);
+
+    std::cout << "best value: " << best_value << "\\n";
+
+    return 0;
+}
 `,
     testCases: [{ input: "", expectedOutput: "best value: 10" }],
   },

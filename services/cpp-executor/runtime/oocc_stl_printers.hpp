@@ -135,7 +135,18 @@ std::string describe_object_body(const std::map<K, V, Rest...>& m, HeapCollector
         if (!first) out += ",";
         first = false;
         std::string kp = key_path(oid, key_repr_of(kv.first));
-        out += "{\"key\":" + describe_value(kv.first, hc, kp + ".key") +
+        // The key is rendered for display only, at "" (never recorded into
+        // hc.current_paths — see HeapCollector::record_path's own
+        // empty-path guard, oocc_trace.hpp): §3.2's ChangedPath grammar has
+        // no `oN{key}.key` form, only the entry's value at `oN{key}` is a
+        // real addressable path. Passing `kp` here instead (found for real
+        // instrumenting the first program to ever exercise this printer,
+        // `two_sum.cpp` — none of the six prior C++ fixtures use
+        // map/unordered_map) clobbered the value's own current_paths entry
+        // with the key's JSON, and `kp + ".key"` produced a path the
+        // schema rejects outright, failing trace validation the moment a
+        // map's key participates in `changed[]`.
+        out += "{\"key\":" + describe_value(kv.first, hc, "") +
                ",\"value\":" + describe_value(kv.second, hc, kp) + "}";
     }
     out += "]}";
@@ -150,7 +161,9 @@ std::string describe_object_body(const std::unordered_map<K, V, Rest...>& m, Hea
         if (!first) out += ",";
         first = false;
         std::string kp = key_path(oid, key_repr_of(kv.first));
-        out += "{\"key\":" + describe_value(kv.first, hc, kp + ".key") +
+        // See the std::map overload above for why the key is described at
+        // "" rather than `kp + ".key"`.
+        out += "{\"key\":" + describe_value(kv.first, hc, "") +
                ",\"value\":" + describe_value(kv.second, hc, kp) + "}";
     }
     out += "]}";

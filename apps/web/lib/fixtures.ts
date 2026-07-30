@@ -39,6 +39,11 @@ export const CPP_FIXTURE_NAMES = [
   "dfs_adjacency_list_cpp",
   "pointer_aliasing_cpp",
   "out_of_bounds_write_cpp",
+  "two_sum_cpp",
+  "fibonacci_recursion_cpp",
+  "quicksort_partition_cpp",
+  "n_queens_cpp",
+  "dp_knapsack_cpp",
 ] as const;
 
 export type FixtureName = (typeof FIXTURE_NAMES)[number] | (typeof CPP_FIXTURE_NAMES)[number];

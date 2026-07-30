@@ -41,6 +41,11 @@ FIXTURE_NAMES = [
     "dfs_adjacency_list",
     "pointer_aliasing",
     "out_of_bounds_write",
+    "two_sum",
+    "fibonacci_recursion",
+    "quicksort_partition",
+    "n_queens",
+    "dp_knapsack",
 ]
 
 _RUN_WASI_JS = REPO_ROOT / ".toolchains" / "run_wasi.mjs"
@@ -84,6 +89,16 @@ def run_wasm(wasm_path: Path) -> tuple[str, bool, str]:
         ["node", "--no-warnings", str(_RUN_WASI_JS), str(wasm_path)],
         capture_output=True,
         text=True,
+        # `text=True` alone decodes with `locale.getpreferredencoding()` —
+        # cp1252 on this Windows sandbox, not UTF-8 — which crashed the
+        # reader thread on the first non-cp1252 byte in a real trace's JSON
+        # output (found for real generating n_queens.trace.json, the first
+        # fixture on this machine with output large/varied enough to hit
+        # it) and silently turned `result.stdout` into `None` rather than
+        # raising somewhere visible. The wasm side always emits UTF-8 (see
+        # oocc_engine.hpp's CapturingStreambuf), so this is the correct
+        # decoding regardless of host locale, not just a Windows patch.
+        encoding="utf-8",
     )
     trapped = result.returncode == 42
     trap_message = ""

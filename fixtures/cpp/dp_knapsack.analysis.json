@@ -1,0 +1,60 @@
+{
+  "structures": [
+    {
+      "kind": "array_2d",
+      "root_ref": "o10",
+      "confidence": 0.8
+    },
+    {
+      "kind": "array",
+      "root_ref": "o2",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o6",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o11",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o17",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o26",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o24",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o35",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o32",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o34",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o42",
+      "confidence": 0.6
+    }
+  ],
+  "insights": []
+}

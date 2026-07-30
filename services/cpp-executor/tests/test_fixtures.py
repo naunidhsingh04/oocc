@@ -27,6 +27,11 @@ FIXTURE_NAMES = [
     "dfs_adjacency_list",
     "pointer_aliasing",
     "out_of_bounds_write",
+    "two_sum",
+    "fibonacci_recursion",
+    "quicksort_partition",
+    "n_queens",
+    "dp_knapsack",
 ]
 
 

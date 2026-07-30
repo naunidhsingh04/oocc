@@ -31,13 +31,17 @@ extracted toolchain has no business in version control):
 ```sh
 mkdir -p .toolchains && cd .toolchains
 curl -sL -o wasi-sdk.tar.gz \
-  https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-arm64-macos.tar.gz
+  https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-<asset>.tar.gz
 tar xzf wasi-sdk.tar.gz && rm wasi-sdk.tar.gz
 ```
 
-(Use the `x86_64-macos` or `*-linux` asset from the same release for other
-hosts.) `cpp_executor/toolchain.py`'s `WASI_SDK_DIR` constant assumes this
-exact path; update it there if you extract elsewhere.
+`<asset>` is `arm64-macos`, `x86_64-macos`, `x86_64-windows`, `arm64-linux`,
+or `x86_64-linux` — pick the one matching your host.
+`cpp_executor/toolchain.py`'s `WASI_SDK_DIR` resolves this automatically
+from `platform.system()`/`platform.machine()` at import time (no
+per-machine edit needed); the extracted directory name it expects is
+exactly the release asset's own directory name (e.g.
+`.toolchains/wasi-sdk-33.0-x86_64-windows/`).
 
 ## Regenerating the C++ fixtures
 

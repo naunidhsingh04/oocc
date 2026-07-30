@@ -1,0 +1,25 @@
+{
+  "structures": [
+    {
+      "kind": "hash_map",
+      "root_ref": "o7",
+      "confidence": 0.7
+    },
+    {
+      "kind": "array",
+      "root_ref": "o2",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o10",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o24",
+      "confidence": 0.6
+    }
+  ],
+  "insights": []
+}

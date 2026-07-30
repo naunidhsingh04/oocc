@@ -1,0 +1,90 @@
+{
+  "structures": [
+    {
+      "kind": "array_2d",
+      "root_ref": "o3",
+      "confidence": 0.8
+    },
+    {
+      "kind": "stack",
+      "root_ref": "o2",
+      "confidence": 0.85
+    },
+    {
+      "kind": "array",
+      "root_ref": "o23",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o44",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o46",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o84",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o87",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o86",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o120",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o151",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o148",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o149",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o146",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o150",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o172",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o199",
+      "confidence": 0.6
+    },
+    {
+      "kind": "array",
+      "root_ref": "o232",
+      "confidence": 0.6
+    }
+  ],
+  "insights": []
+}

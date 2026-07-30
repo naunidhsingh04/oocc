@@ -79,6 +79,16 @@ int main() {
         assert(body.find("\"entries\"") != std::string::npos);
         assert(body.find("\"key\":{\"val\":1}") != std::string::npos);
         assert(body.find("\"value\":{\"val\":10}") != std::string::npos);
+        // Regression: a key's own describe_value() call used to be given
+        // `oN{key}.key` as its path, which §3.2's ChangedPath grammar
+        // rejects outright (only `oN{key}` — the entry's value — is a
+        // real addressable path) — this failed real trace validation the
+        // first time a program actually exercised this printer
+        // (fixtures/cpp/programs/two_sum.cpp, the first C++ fixture to use
+        // map/unordered_map). The entry's value path must still be
+        // recorded; the key must not record any path of its own.
+        assert(hc.current_paths.count("o1{1}") == 1);
+        assert(hc.current_paths.count("o1{1}.key") == 0);
     }
 
     // unordered_map
@@ -89,6 +99,8 @@ int main() {
         std::string body = describe_object_body(m, hc, "o1");
         assert(body.find("\"type\":\"dict\"") != std::string::npos);
         assert(body.find("\"key\":{\"val\":7}") != std::string::npos);
+        assert(hc.current_paths.count("o1{7}") == 1);
+        assert(hc.current_paths.count("o1{7}.key") == 0);
     }
 
     // set

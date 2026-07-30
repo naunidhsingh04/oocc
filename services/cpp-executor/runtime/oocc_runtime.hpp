@@ -48,7 +48,18 @@ namespace oocc {
 // object the STL's own allocators create too.
 // ---------------------------------------------------------------------
 
-constexpr size_t kArenaBytes = 64ull * 1024 * 1024;
+// 64MB (the original value here) was never actually stress-tested against
+// a real "big" C++ trace — none of the six original fixtures produce more
+// than a few hundred steps. `fixtures/cpp/programs/n_queens.cpp` (the
+// first C++ fixture with real backtracking recursion, ~5,200 steps) hit
+// this ceiling for real during finalize_and_emit's own JSON assembly
+// (oocc_engine.hpp): it concatenates every already-built per-step JSON
+// string into one final string, which transiently holds *both* the
+// per-step strings and the new concatenated copy at once — for a program
+// whose own tracked heap usage was tiny (27 live objects at the point it
+// ran out), this bookkeeping overhead alone exceeded 64MB. Doubled to
+// 128MB for headroom; still trivial for any real WASM host to allocate.
+constexpr size_t kArenaBytes = 128ull * 1024 * 1024;
 
 struct FreeBlock {
     size_t size;      // payload bytes available, excluding header
