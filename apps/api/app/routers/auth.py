@@ -272,3 +272,19 @@ async def logout(response: Response) -> dict[str, bool]:
 @router.get("/api/auth/me")
 async def me(user: User = Depends(get_current_user)) -> dict[str, Any]:
     return _user_out(user)
+
+
+@router.get("/api/auth/session")
+async def session(user: User | None = Depends(get_current_user_optional)) -> dict[str, Any]:
+    """Always 200, unlike `/api/auth/me` (which 401s with no session, by
+    design — a route that genuinely requires a user). This one exists so a
+    frontend can check "is anyone logged in" up front without a 401 being
+    the only way to find out — the progress dashboard was firing
+    `GET /api/progress`/`GET /api/progress/review-queue` unconditionally on
+    every load, which are genuinely session-gated (brief item 3, no
+    meaningful anonymous view of someone else's progress) and therefore
+    401 on every single load for every signed-out visitor. This endpoint
+    lets it check first and skip those calls entirely when there's no
+    session, instead of firing them and treating "401" as the answer.
+    """
+    return {"user": _user_out(user) if user is not None else None}

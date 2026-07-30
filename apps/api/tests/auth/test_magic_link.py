@@ -118,6 +118,26 @@ def test_me_requires_authentication(client: TestClient) -> None:
     assert response.status_code == 401
 
 
+def test_session_is_200_with_null_user_when_signed_out(client: TestClient) -> None:
+    # Unlike /api/auth/me (401 with no session, by design), /api/auth/session
+    # exists precisely so a frontend can check "is anyone logged in" without
+    # a 401 being the only signal — see the progress dashboard's use of it.
+    response = client.get("/api/auth/session")
+    assert response.status_code == 200
+    assert response.json() == {"user": None}
+
+
+def test_session_reports_the_signed_in_user(client: TestClient) -> None:
+    client.post("/api/auth/magic-link/request", json={"email": "session@example.com"})
+    mail_sender: InMemoryMailSender = client.mail_sender  # type: ignore[attr-defined]
+    token = mail_sender.sent[0].body.split("token=")[1].split("\n")[0]
+    client.post("/api/auth/magic-link/redeem", json={"token": token})
+
+    response = client.get("/api/auth/session")
+    assert response.status_code == 200
+    assert response.json()["user"]["email"] == "session@example.com"
+
+
 def test_logout_clears_the_session_cookie(client: TestClient) -> None:
     client.post("/api/auth/magic-link/request", json={"email": "logout@example.com"})
     mail_sender: InMemoryMailSender = client.mail_sender  # type: ignore[attr-defined]

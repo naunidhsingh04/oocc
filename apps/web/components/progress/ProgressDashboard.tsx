@@ -3,6 +3,7 @@
 import { fetchProgress, fetchReviewQueue } from "@/lib/progress/api";
 import { buildDemoProgressRecords } from "@/lib/progress/demoData";
 import { orderReviewQueue } from "@/lib/progress/reviewQueue";
+import { hasActiveSession } from "@/lib/progress/session";
 import { buildAttemptedConceptViews, buildConceptViews } from "@/lib/progress/views";
 import { selectWeakConcepts } from "@/lib/progress/weakConcepts";
 import type { ProgressRecord } from "@/lib/progress/types";
@@ -20,21 +21,33 @@ interface LoadedState {
 
 /**
  * `/progress` — brief items 1-4 assembled: concept graph, review queue,
- * run history, weak concepts. Attempts the real, session-gated
- * `GET /api/progress` + `GET /api/progress/review-queue` first
- * (`lib/progress/api.ts`); degrades to clearly-labeled demo data on a 401
- * or network failure, since there's no login UI in this frontend yet (see
- * that file's docstring). `progress === null` (not `[]`) is what "degrade"
- * actually means here — a real, signed-in, zero-rows response renders as a
- * genuinely empty (not demo) dashboard.
+ * run history, weak concepts. Checks `GET /api/auth/session` first
+ * (`lib/progress/session.ts`, always 200) and only fires the real,
+ * session-gated `GET /api/progress` + `GET /api/progress/review-queue`
+ * (`lib/progress/api.ts`) when a session actually comes back — those two
+ * routes 401 with no session by design (no meaningful anonymous view of
+ * someone else's progress), so firing them unconditionally meant every
+ * signed-out visitor got two logged 401s on every single page load.
+ * Degrades to clearly-labeled demo data whenever there's no session (or
+ * the API is unreachable), since there's no login UI in this frontend
+ * yet. `progress === null` (not `[]`) is what "degrade" actually means
+ * here — a real, signed-in, zero-rows response renders as a genuinely
+ * empty (not demo) dashboard.
  */
 export function ProgressDashboard() {
   const [state, setState] = useState<LoadedState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([fetchProgress(), fetchReviewQueue()]).then(([progress, reviewQueue]) => {
-      if (!cancelled) setState({ progress, reviewQueue });
+    void hasActiveSession().then((signedIn) => {
+      if (cancelled) return;
+      if (!signedIn) {
+        setState({ progress: null, reviewQueue: null });
+        return;
+      }
+      void Promise.all([fetchProgress(), fetchReviewQueue()]).then(([progress, reviewQueue]) => {
+        if (!cancelled) setState({ progress, reviewQueue });
+      });
     });
     return () => {
       cancelled = true;

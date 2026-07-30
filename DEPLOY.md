@@ -32,9 +32,9 @@ Deploy in this order — each step needs the previous one's URL.
   `Dockerfile path: apps/api/Dockerfile`, build context: repo root.
 - Health check path: `/health`.
 - Set every environment variable in the table below. At minimum:
-  `ENVIRONMENT`, `CORS_ORIGINS`, `SESSION_SECRET`, `EXECUTOR_URL`
+  `ENVIRONMENT`, `ALLOWED_ORIGINS`, `SESSION_SECRET`, `EXECUTOR_URL`
   (step 1's URL). The API **refuses to start** if `ENVIRONMENT=production`
-  and `SESSION_SECRET`/`CORS_ORIGINS` are missing or insecure — see
+  and `SESSION_SECRET`/`ALLOWED_ORIGINS` are missing or insecure — see
   "Fails loud on purpose" below.
 - `DATABASE_URL` is optional (see the env var table) — if you set it,
   migrations run automatically on every container start
@@ -47,7 +47,7 @@ Deploy in this order — each step needs the previous one's URL.
   Environment Variables — **before** the next build, since
   `NEXT_PUBLIC_*` is inlined at build time, not read at runtime. Redeploy
   after setting it if you set it after the last build.
-- Update `CORS_ORIGINS` on the API (step 2) to include this exact Vercel
+- Update `ALLOWED_ORIGINS` on the API (step 2) to include this exact Vercel
   origin, then redeploy the API — CORS is enforced by origin, and the two
   values have to match.
 
@@ -59,7 +59,7 @@ Deploy in this order — each step needs the previous one's URL.
 |---|---|---|
 | `ENVIRONMENT` | **Yes** — set to `production` | Enables the startup checks below. Without it, the two checks are silently skipped. |
 | `PORT` | No (Render sets it) | Port to bind. Defaults to 8000. |
-| `CORS_ORIGINS` | **Yes** | Comma-separated exact origins allowed to call the API with credentials. Never `*`. |
+| `ALLOWED_ORIGINS` | **Yes** | Comma-separated exact origins allowed to call the API with credentials. Never `*`. |
 | `SESSION_SECRET` | **Yes** | Signs session cookies + magic-link tokens. A forgeable, publicly-known default exists for local dev only — see below. |
 | `EXECUTOR_URL` | **Yes** | Base URL of the deployed executor (step 1). |
 | `DATABASE_URL` | No | Postgres connection string. Unset = accounts/problems/progress/RAG tutor-grounding stay in their fail-open fallback state; everything else (including `POST /api/runs`) works fine without it. |
@@ -95,12 +95,61 @@ not "starts insecurely" — if `ENVIRONMENT=production` and either:
   Every session cookie and magic-link token is signed with this value;
   the dev default is sitting in this repo's own source, so leaving it
   unset in production means anyone can forge a valid login.
-- `CORS_ORIGINS` is unset, empty, or contains `*`. The API allows
+- `ALLOWED_ORIGINS` is unset, empty, or contains `*`. The API allows
   credentialed (cookie-bearing) cross-origin requests — a wildcard origin
   combined with credentials is a real exposure, not a style nit.
 
 If the API won't start on Render, check its logs for a `RuntimeError`
 from `env_checks.py` first — it names exactly which variable is missing.
+
+## Verifying CORS is actually configured
+
+Every boot logs the parsed, final `ALLOWED_ORIGINS` list as a structured
+line — `{"allowed_origins": [...], "event": "cors.configured", ...}` —
+right after parsing, unconditionally (not just in debug mode). Check this
+in Render's log tab first whenever CORS looks broken:
+
+- **The list is empty or still `["http://localhost:3000"]`**: the env var
+  isn't reaching the process — check the exact name (`ALLOWED_ORIGINS`,
+  not `CORS_ORIGINS`/`CORS_ALLOWED_ORIGINS`/any other variant) in Render's
+  dashboard, and that it's set on the `apps/api` service specifically, not
+  the executor.
+- **The list has your origin but with a trailing slash, and the frontend
+  still gets rejected**: shouldn't happen — parsing strips a trailing `/`
+  automatically — but if you're running code from before this fix,
+  `https://oocc-six.vercel.app/` (with the slash) never matches the
+  browser's `Origin` header (`https://oocc-six.vercel.app`, always
+  slash-less), and CORSMiddleware fails closed with no error logged
+  anywhere on the server side.
+- **The list looks correct and it's still failing**: open the failing
+  request in the browser's Network tab, not just the Console — a
+  same-shaped failure with *no* `OPTIONS` preflight request at all usually
+  means the frontend itself isn't sending credentials/the right headers,
+  not a server misconfiguration.
+
+Also worth confirming directly with `curl` (which shows the real response
+even when a browser's CORS check would hide it):
+
+```sh
+curl -i -X OPTIONS https://oocc-api.onrender.com/api/runs \
+  -H "Origin: https://oocc-six.vercel.app" \
+  -H "Access-Control-Request-Method: POST"
+```
+
+Expect `200` and an `Access-Control-Allow-Origin` header matching your
+origin exactly. This should now succeed on **every** route, including
+ones that don't exist and ones that return an error — CORSMiddleware
+answers preflight at the ASGI level before routing or your route's own
+logic ever runs, and every error response (404, 401, 422, and even a
+genuinely unhandled 500) now carries CORS headers too, not just 2xx
+responses. See `apps/api/tests/test_cors.py` for the full regression
+suite backing this, including the two real bugs found and fixed here:
+Starlette pulls a bare-`Exception` handler out into
+`ServerErrorMiddleware`, architecturally outside CORSMiddleware, so that
+handler now attaches CORS headers by hand; and `add_middleware` inserts
+at the *front* of the middleware list, so the registration order that
+reads correct in the source (CORS added first) actually produced the
+opposite of the intended layering.
 
 ## Executor networking
 
@@ -133,12 +182,27 @@ Render's exact equivalent depends on your plan:
   warn you — and everything "just works." In production this is now a
   hard startup failure (see above) specifically so this can't ship
   silently insecure instead.
-- **`CORS_ORIGINS` left at its `http://localhost:3000` default, or set to
+- **`ALLOWED_ORIGINS` left at its `http://localhost:3000` default, or set to
   `*`.** Locally this is exactly right. In production it's now a hard
   startup failure for the same reason — and even before this change, a
   wildcard would have silently blocked your real frontend from ever
   successfully calling the API (or worse, "worked" while allowing any
   origin to make credentialed requests).
+- **A misspelled or renamed CORS env var name is invisible until you go
+  looking.** This literally happened during this repo's own first Render
+  deploy: `apps/api/app/main.py` read `CORS_ORIGINS`, but the Render
+  service had `ALLOWED_ORIGINS` set — nothing crashed, nothing errored on
+  the server, `ENVIRONMENT=production`'s own startup check passed (an
+  unset var falling back to `http://localhost:3000` is neither empty nor
+  `*`), and the API ran and served requests completely normally for every
+  same-origin/no-origin caller. The *only* symptom was every real
+  cross-origin request from the deployed frontend failing preflight in
+  the browser with no corresponding error anywhere in the API's own logs
+  — because from the server's point of view, it correctly rejected an
+  origin that (per its own, wrongly-sourced config) genuinely wasn't on
+  the list. The `cors.configured` startup log line exists specifically to
+  make this class of bug show up immediately instead of requiring this
+  exact debugging session to track down.
 - **`NEXT_PUBLIC_API_URL` unset on Vercel.** The frontend falls back to
   `http://localhost:8000`, which doesn't exist on a visitor's machine.
   The site itself still loads and works (fixtures/curriculum/problems are

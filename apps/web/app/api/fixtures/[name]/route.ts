@@ -56,7 +56,16 @@ export async function GET(_request: Request, context: { params: Promise<{ name: 
       analysis: JSON.parse(analysisText) as unknown,
       plan: JSON.parse(planText) as unknown,
     });
-  } catch {
+  } catch (error) {
+    // A bare 500 with no logged cause is exactly what made the Root
+    // Directory bug (see the module docstring above) so slow to track
+    // down — the route "just" 500'd, with nothing in Vercel's function
+    // logs pointing at *why* (ENOENT on a specific path? a JSON parse
+    // failure? something else?). console.error here lands in Vercel's
+    // function logs (and the terminal under `next dev`), so the next
+    // failure — a bad regeneration, a missing file, anything — shows its
+    // real cause immediately instead of requiring a fresh investigation.
+    console.error(`/api/fixtures/${name}: failed to load fixture data`, error);
     return NextResponse.json({ error: `could not read fixture "${name}"` }, { status: 500 });
   }
 }

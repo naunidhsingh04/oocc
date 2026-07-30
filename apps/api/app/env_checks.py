@@ -1,12 +1,15 @@
 """Fail-loud startup checks for production misconfiguration that would
 otherwise be silent security holes rather than crashes — the difference
 matters because every default in this codebase is deliberately permissive
-for local dev (see app/auth/tokens.py, app/main.py's CORS default): the
-same fallback that makes `uv run uvicorn ...` work with zero setup also
-makes a deploy with a forgotten env var *look* like it's working while
-actually being forgeable/wide open. Gated on `ENVIRONMENT=production`
-(set by every Dockerfile/DEPLOY.md in this repo) so local dev and tests
-never trip these.
+for local dev (see app/auth/tokens.py, app/main.py's ALLOWED_ORIGINS
+default): the same fallback that makes `uv run uvicorn ...` work with
+zero setup also makes a deploy with a forgotten env var *look* like it's
+working while actually being forgeable/wide open, or — for a misspelled/
+wrong CORS env var name specifically — just silently broken with no
+error anywhere, since a browser's CORS rejection never reaches this
+server's logs at all. Gated on `ENVIRONMENT=production` (set by every
+Dockerfile/DEPLOY.md in this repo) so local dev and tests never trip
+these.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ def is_production() -> bool:
     return os.environ.get("ENVIRONMENT", "development") == "production"
 
 
-def check_production_config(*, cors_origins: list[str]) -> None:
+def check_production_config(*, allowed_origins: list[str]) -> None:
     if not is_production():
         return
 
@@ -33,11 +36,11 @@ def check_production_config(*, cors_origins: list[str]) -> None:
             "random value (see .env.example)."
         )
 
-    if not cors_origins or "*" in cors_origins:
+    if not allowed_origins or "*" in allowed_origins:
         raise RuntimeError(
-            "CORS_ORIGINS is unset, empty, or contains '*' while ENVIRONMENT=production. "
+            "ALLOWED_ORIGINS is unset, empty, or contains '*' while ENVIRONMENT=production. "
             "Refusing to start: this API allows credentialed requests (cookies), and a "
             "wildcard origin combined with credentials is a real CSRF-style exposure, not "
-            "just a lint rule. Set CORS_ORIGINS to your exact frontend origin(s), "
+            "just a lint rule. Set ALLOWED_ORIGINS to your exact frontend origin(s), "
             "comma-separated (see .env.example)."
         )
