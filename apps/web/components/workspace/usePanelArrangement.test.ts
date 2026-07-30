@@ -62,6 +62,27 @@ describe("usePanelArrangement", () => {
     expect(result.current.panels).toEqual(PLAN.panels);
   });
 
+  it("never reassigns an existing local-N id after a fresh mount restores a persisted arrangement", () => {
+    // Simulates a real page reload: the hook's own module state doesn't
+    // carry over (a brand-new renderHook stands in for that), but
+    // localStorage does. A counter that only lived in memory would reset
+    // to `local-1` here and collide with the one already persisted —
+    // exactly the bug that crashed `/play` in production with
+    // `react-resizable-panels`' "Panel ids must be unique."
+    const { result: first, unmount } = renderHook(() => usePanelArrangement(PLAN, "reload-key"));
+    act(() => first.current.addPanel("console"));
+    expect(first.current.panels.some((p) => p.id === "local-1")).toBe(true);
+    unmount();
+
+    const { result: second } = renderHook(() => usePanelArrangement(PLAN, "reload-key"));
+    act(() => second.current.addPanel("timeline"));
+
+    const ids = second.current.panels.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("local-1");
+    expect(ids).toContain("local-2");
+  });
+
   it("clears maximizedId when the maximized panel is removed", () => {
     const { result } = renderHook(() => usePanelArrangement(PLAN, "test-key-3"));
     act(() => result.current.setMaximizedId("p1"));

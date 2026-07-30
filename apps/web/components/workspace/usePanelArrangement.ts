@@ -33,7 +33,30 @@ function loadStored(key: string): StoredArrangement | null {
   }
 }
 
-let nextLocalId = 1;
+/**
+ * The next `local-N` id, derived from whatever panels are actually
+ * present right now rather than a module-level counter. The counter
+ * version was a real, shipped bug: `nextLocalId` lives for as long as the
+ * JS module does, which is exactly one page load — but the arrangement
+ * itself is persisted to `localStorage` and outlives that. Add one panel
+ * (`local-1`, counter now at 2), reload the page (fresh module, counter
+ * back to 1, but `local-1` is still in the restored arrangement), add
+ * another panel, and it's assigned `local-1` again — colliding with the
+ * one already there. `react-resizable-panels` throws `Panel ids must be
+ * unique; id "local-1" was used more than once`, taking down the whole
+ * panel grid (confirmed live: this is exactly the crash a user hit on the
+ * deployed site). Scanning the live panel list for the highest existing
+ * `local-N` and adding one is stable across reloads because it has no
+ * memory of its own to fall out of sync with the thing it's protecting.
+ */
+function nextLocalPanelId(panels: PlanPanelNode[]): string {
+  let max = 0;
+  for (const p of panels) {
+    const match = /^local-(\d+)$/.exec(p.id);
+    if (match) max = Math.max(max, Number(match[1]));
+  }
+  return `local-${max + 1}`;
+}
 
 /**
  * Owns the mutable, user-editable panel arrangement for one loaded
@@ -68,8 +91,7 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   }, [panels, storageKey]);
 
   const addPanel = (type: PanelType) => {
-    const id = `local-${nextLocalId++}`;
-    setPanels((prev) => [...prev, { id, type, role: "secondary" }]);
+    setPanels((prev) => [...prev, { id: nextLocalPanelId(prev), type, role: "secondary" }]);
   };
 
   const removePanel = (id: string) => {
