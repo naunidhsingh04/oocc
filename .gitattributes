@@ -1,0 +1,6 @@
+# Shell scripts run inside Linux containers (apps/api/docker-entrypoint.sh,
+# services/executor/docker-entrypoint.sh) — a CRLF shebang line
+# (`#!/bin/sh\r`) fails with "no such file or directory" in the container,
+# a confusing failure mode entirely caused by checking these out on
+# Windows. Force LF regardless of this repo's/contributor's core.autocrlf.
+*.sh text eol=lf
