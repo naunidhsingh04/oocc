@@ -5,7 +5,7 @@ calls for at Phase 6, extended to the C++ path (§3.5), which had never had
 one. Every result below was actually run in this session, against this
 repo's real code, not inferred from reading it — see the test files cited
 next to each finding. Severity is my own honest judgment, not a formal
-scoring system.
+scoring system
 
 **Headline: the Python sandbox has no OS-level isolation deployed yet, and
 one class of C++-path bug (documented below) can crash the compile process
@@ -46,7 +46,7 @@ defense-in-depth on top of a boundary that doesn't exist yet.
 
 ### 1.2 What this session added (Python-level defense-in-depth)
 
-None of this existed before this session — the tracer had *zero*
+None of this existed before this session — the tracer had _zero_
 protections beyond the step-count/wall-clock/heap-object/stdout limits
 already in `tracer.py` (§3.3, unaffected by this review). `services/
 executor/executor_app/sandbox_imports.py` is new:
@@ -92,7 +92,7 @@ print(found)   # <class 'subprocess.Popen'>
 This walks the live object graph (`object` → every loaded subclass) to
 reach `subprocess.Popen` without ever calling `__import__`. It works because
 `subprocess` (or something that imports it) is already loaded somewhere in
-the *executor process* by the time user code runs — a structural property
+the _executor process_ by the time user code runs — a structural property
 of "no OS isolation, shared interpreter," not a bug in the allowlist logic.
 **No Python-level fix closes this in general** — it's the reason §1.1's
 OS-level sandbox isn't optional. This test is a deliberate regression guard:
@@ -106,18 +106,18 @@ PRD §5 asked for this in Phase 1. It didn't exist until this session. Every
 case below was run for real against the current in-process `Tracer`, not
 reasoned about from reading the code:
 
-| Case | Result | Mechanism |
-|---|---|---|
-| `while True: i += 1` | Fails safely (`status: step_limit`) in <1s | Tracer's own `wall_clock_limit_s`, independent of OS sandboxing |
-| Deep recursion (`f(n): return f(n+1)`) | Fails safely (`RecursionError`, useful step index) | CPython's own recursion limit |
-| `for i in range(10**9): ...` | Bounded by `step_limit`, not by actually finishing | Tracer's own step counter |
-| `print('☃' * 5_000_000)` (unicode bomb) | Truncated at the 256KB stdout cap | Existing `stdout_limit_bytes` logic |
-| `import os` / `subprocess` / `socket` / `ctypes` / `importlib` / `shutil` / `pathlib` / `multiprocessing` / `pickle` | All blocked, clear error | New import allowlist (§1.2) |
-| `open('/etc/passwd')` | Blocked, clear error | New `open` removal (§1.2) |
-| `os.system(...)` / `socket.connect(...)` | Blocked (can't even import the module) | New import allowlist |
-| subclasses-gadget bypass | **Succeeds** — reaches `subprocess.Popen` | Confirmed open gap, §1.3 |
-| ~1M-element list, single step | Times out (`status: step_limit`) *before* revealing anything about memory — see below | Wall-clock limit, incidentally |
-| 8MB single string allocation | **Succeeds**, `status: ok`, no limit enforced | Confirmed open gap — see below |
+| Case                                                                                                                 | Result                                                                                | Mechanism                                                       |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `while True: i += 1`                                                                                                 | Fails safely (`status: step_limit`) in <1s                                            | Tracer's own `wall_clock_limit_s`, independent of OS sandboxing |
+| Deep recursion (`f(n): return f(n+1)`)                                                                               | Fails safely (`RecursionError`, useful step index)                                    | CPython's own recursion limit                                   |
+| `for i in range(10**9): ...`                                                                                         | Bounded by `step_limit`, not by actually finishing                                    | Tracer's own step counter                                       |
+| `print('☃' * 5_000_000)` (unicode bomb)                                                                              | Truncated at the 256KB stdout cap                                                     | Existing `stdout_limit_bytes` logic                             |
+| `import os` / `subprocess` / `socket` / `ctypes` / `importlib` / `shutil` / `pathlib` / `multiprocessing` / `pickle` | All blocked, clear error                                                              | New import allowlist (§1.2)                                     |
+| `open('/etc/passwd')`                                                                                                | Blocked, clear error                                                                  | New `open` removal (§1.2)                                       |
+| `os.system(...)` / `socket.connect(...)`                                                                             | Blocked (can't even import the module)                                                | New import allowlist                                            |
+| subclasses-gadget bypass                                                                                             | **Succeeds** — reaches `subprocess.Popen`                                             | Confirmed open gap, §1.3                                        |
+| ~1M-element list, single step                                                                                        | Times out (`status: step_limit`) _before_ revealing anything about memory — see below | Wall-clock limit, incidentally                                  |
+| 8MB single string allocation                                                                                         | **Succeeds**, `status: ok`, no limit enforced                                         | Confirmed open gap — see below                                  |
 
 **Two things not run at hostile scale, deliberately, and why:**
 
@@ -139,13 +139,13 @@ reasoned about from reading the code:
   different angle.
 
 **Incidental finding, not a new mitigation:** a large single-step
-allocation (e.g. a 1M-element *list*, as opposed to one big string) makes
+allocation (e.g. a 1M-element _list_, as opposed to one big string) makes
 `_snapshot()`'s full per-step heap walk slow enough to trip the wall-clock
 limit on its own, before any loop even runs. This means the wall-clock
-check is accidentally also a rough memory/complexity backstop for *this*
+check is accidentally also a rough memory/complexity backstop for _this_
 specific shape of attack — but it's incidental, not designed, and shouldn't
 be relied on as the real mitigation (a shape that allocates a lot of memory
-without it being *walked* every step, e.g. one giant string, sails through
+without it being _walked_ every step, e.g. one giant string, sails through
 untouched, per the row above).
 
 ### 1.5 A real, unrelated bug this review found and fixed: module objects crash the tracer
@@ -156,7 +156,7 @@ other ten allowlisted modules — failed with `RecursionError` before this
 session's fix. Root cause (found by removing the tracer's own error
 swallowing to see the real traceback): binding a module as a local
 (`import random` → `random` in scope) made `_encode_heap_object` try to
-walk the *entire* module `__dict__` as a generic object's fields — every
+walk the _entire_ module `__dict__` as a generic object's fields — every
 function, submodule, `__loader__`'s importlib internals, `__builtins__` —
 deep and wide enough to blow Python's default recursion limit before ever
 finishing. Not a true infinite cycle (the heap-id dedup means a real cycle
@@ -180,9 +180,9 @@ Two constraints shaped what could actually be tested here:
   `WASI_SDK_DIR` is hardcoded to a macOS arm64 release tarball path from
   wherever this was originally built — genuinely absent here, not a
   configuration oversight to fix in this session. This means the actual
-  wasm *compile* step (both the instrumented path and the "untraced"
+  wasm _compile_ step (both the instrumented path and the "untraced"
   fallback) could not be exercised end-to-end. `services/cpp-executor/
-  tests`' 11 pre-existing failures needing this toolchain are unrelated to
+tests`' 11 pre-existing failures needing this toolchain are unrelated to
   this session's changes (confirmed: identical 16-failing baseline on
   `main` before this session touched anything, now 11 after a portability
   fix — §2.1 — recovered 5 of them).
@@ -209,13 +209,13 @@ failing tests in `test_instrument.py` now pass as a direct result.
 
 ### 2.2 Hostile input to clang — results (ad hoc scripts this session, not yet a committed test file beyond §2.4's regression suite)
 
-| Case | Result |
-|---|---|
+| Case                                                           | Result                                                                                                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | Deep template instantiation (`Fib<35>` via recursive template) | Rejected at parse time with a clear diagnostic ("class templates" unsupported) — the teaching-subset design working as intended |
-| Deeply nested parens (3,000 deep) | Rejected by **clang's own** parser guard: `"bracket nesting level exceeded maximum of 256"` |
-| Deeply nested blocks (2,000 deep) | Same clang guard, same message |
-| Malformed/garbage source | Clean `parse_error` diagnostics, no crash |
-| Unicode bomb in a string literal | Handled as ordinary (very long) source text |
+| Deeply nested parens (3,000 deep)                              | Rejected by **clang's own** parser guard: `"bracket nesting level exceeded maximum of 256"`                                     |
+| Deeply nested blocks (2,000 deep)                              | Same clang guard, same message                                                                                                  |
+| Malformed/garbage source                                       | Clean `parse_error` diagnostics, no crash                                                                                       |
+| Unicode bomb in a string literal                               | Handled as ordinary (very long) source text                                                                                     |
 
 ### 2.3 Compile bombs — a real, measured, quadratic-time vulnerability, mitigated
 
@@ -223,11 +223,11 @@ A translation unit of trivial one-line functions (no templates, no
 recursion — just many functions) instruments in time that scales
 **quadratically** with function count, measured directly:
 
-| Function count | Time |
-|---|---|
-| 2,000 | 2.1s |
-| 5,000 | 15.2s |
-| 20,000 | did not finish in 30s (timed out) |
+| Function count | Time                              |
+| -------------- | --------------------------------- |
+| 2,000          | 2.1s                              |
+| 5,000          | 15.2s                             |
+| 20,000         | did not finish in 30s (timed out) |
 
 Nothing downstream bounded this before this session: `toolchain.py`'s
 `subprocess.run` calls for the actual clang++ compile had **no timeout at
@@ -236,7 +236,7 @@ cap. **Mitigated, not fixed**: added `MAX_SOURCE_BYTES = 200_000` (~5,000
 lines) to `instrument.py`, checked before any parsing starts, in both
 `compile_source` and `compile_untraced` (independently — `compile_untraced`
 is its own public entrypoint and shouldn't rely on `compile_source`'s check
-running first). This bounds the *worst* case but not the ordinary one — a
+running first). This bounds the _worst_ case but not the ordinary one — a
 147KB file (comfortably under the cap) still took ~10-15s to instrument in
 this testing, well past PRD §3.5's "cold compile ≤2s p95" target. The
 quadratic algorithm itself (somewhere in `instrument()`'s AST walk) is the
@@ -258,7 +258,7 @@ stderr: (empty)
 ```
 
 Root cause: clang's recursive-descent expression parser recurses once per
-operator in a flat chain like this, and — unlike the *bracket*-nesting
+operator in a flat chain like this, and — unlike the _bracket_-nesting
 guard that caught the deeply-nested-parens case cleanly (§2.2) — has no
 equivalent depth guard for a flat operator chain. 40,000 levels of native
 recursion overflows the parser's own C++ call stack: a hard segfault-class
@@ -285,7 +285,7 @@ Verified for real, both directions:
 
 - The crashing input above: contained, returns a clean diagnostic in 0.81s
   (`test_instrument_isolated.py::test_a_parser_crashing_input_is_contained_not_propagated`).
-  the same input run *without* isolation still crashes the process, as a
+  the same input run _without_ isolation still crashes the process, as a
   live regression check that the fix is actually doing something.
 - Ordinary sources and the already-working "unsupported construct"
   diagnostics: unaffected (`test_instrument_isolated.py`'s other two tests).
@@ -316,7 +316,7 @@ one-construct patch wouldn't be.
 Everything requiring an actual wasm compile — "enormous generated WASM,"
 whether the STL pretty-printers or the runtime's arena allocator hold up
 under adversarial input, whether a genuinely huge (but under-cap) source
-compiles within reasonable *wall-clock* time end-to-end — needs a real
+compiles within reasonable _wall-clock_ time end-to-end — needs a real
 wasi-sdk toolchain, which this session's environment doesn't have. This is
 an environment gap, not a "didn't get to it" gap: flag it for the next
 session that runs on a machine with the toolchain available (CLAUDE.md's
