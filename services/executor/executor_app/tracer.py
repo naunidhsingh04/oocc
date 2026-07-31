@@ -347,6 +347,32 @@ class Tracer:
         if self._state.frame_stack:
             self._state.frame_stack[-1].line = frame.f_lineno
             self._state.frame_stack[-1].live_frame = frame
+        if isinstance(exc, RecursionError):
+            # A genuine deep-recursion program raises RecursionError right
+            # at the interpreter's recursion limit — but _record_step's own
+            # bookkeeping (source-line lookups via inspect.findsource, and
+            # _snapshot's own nested calls) needs a handful of Python-level
+            # call frames of its own to run. With zero headroom, that
+            # bookkeeping call can itself raise a *new* RecursionError — a
+            # different exception object, so the id() dedup check above
+            # doesn't catch it — which this same handler then processes
+            # too, cascading indefinitely until it degrades into a
+            # MemoryError (found for real: a genuine deep-recursion
+            # fixture reproduced this every time, on every machine tried,
+            # regardless of wall-clock budget — this was never a timing
+            # issue). A temporary, small recursion-limit bump gives the
+            # bookkeeping enough room to finish for *this* exception
+            # without allowing the user's own code any further recursion
+            # (monitoring is only re-entered by this handler's own calls,
+            # not by anything the traced program does — it has already
+            # unwound past the point where it could recurse further).
+            limit = sys.getrecursionlimit()
+            sys.setrecursionlimit(limit + 200)
+            try:
+                self._record_step("exception")
+            finally:
+                sys.setrecursionlimit(limit)
+            return
         self._record_step("exception")
 
     def _on_stdout_write(self, text: str) -> None:
