@@ -17,6 +17,7 @@ deep recursion, huge ranges, and a scaled-down memory-growth probe.
 
 from __future__ import annotations
 
+import sys
 import time
 
 from executor_app.tracer import Tracer
@@ -45,18 +46,28 @@ def test_infinite_loop_is_stopped_by_wall_clock_not_left_to_run_forever() -> Non
 
 def test_deep_recursion_fails_safely_with_a_useful_error() -> None:
     source = "def f(n):\n    return f(n + 1)\nf(0)\n"
-    # A generous wall_clock_limit_s, not the 5.0s default: this test is
-    # about the RecursionError path specifically, and full per-step
-    # frame/heap snapshotting is expensive enough per call that reaching
-    # Python's default recursion limit (~1000 frames, ~2000 traced steps)
-    # took the full 5s default and lost the race to the wall-clock check on
-    # both this repo's CI runners and a plain dev machine — found for real
-    # timing it directly (1937/~2000 needed steps at the 5.016s mark, so
-    # close it reads as a coin flip, not a margin). Same fix shape as
-    # test_infinite_loop_is_stopped_by_wall_clock_not_left_to_run_forever's
-    # own step_limit bump above: give the *other* limit enough headroom
-    # that it can't preempt the one this test is actually exercising.
-    trace = Tracer(wall_clock_limit_s=30.0).run(source)
+    # Lowers Python's own recursion limit for the duration of this test,
+    # rather than just giving Tracer a bigger wall_clock_limit_s budget: an
+    # earlier version of this fix tried the latter (30.0s, reasoned from a
+    # single local timing of 1937/~2000 needed steps at the *old* 5.0s
+    # default) and *still* flaked on this repo's CI runners — full per-step
+    # frame/heap snapshotting is expensive enough that actually completing
+    # the ~2000 steps needed to hit Python's default recursion limit
+    # (~1000 frames) took 15.3s measured for real on a second run, nearly
+    # half the "generous" 30s budget, on hardware already faster than a
+    # shared CI runner is likely to be — any wall-clock margin is a bet on
+    # relative machine speed, which is exactly the kind of bet that made
+    # this test flake in the first place. `Tracer.run` never touches
+    # `sys.getrecursionlimit()` itself (it's whatever the calling process
+    # has), so capping it here to a small, fixed number makes this test
+    # need a small, fixed, hardware-independent number of steps instead —
+    # genuinely fast and deterministic rather than racing two limits.
+    original_limit = sys.getrecursionlimit()
+    sys.setrecursionlimit(200)
+    try:
+        trace = Tracer().run(source)
+    finally:
+        sys.setrecursionlimit(original_limit)
 
     assert trace["status"] == "runtime_error"
     assert trace["error"]["type"] == "RecursionError"
