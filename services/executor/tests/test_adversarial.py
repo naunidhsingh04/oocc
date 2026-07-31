@@ -17,7 +17,6 @@ deep recursion, huge ranges, and a scaled-down memory-growth probe.
 
 from __future__ import annotations
 
-import sys
 import time
 
 from executor_app.tracer import Tracer
@@ -46,28 +45,31 @@ def test_infinite_loop_is_stopped_by_wall_clock_not_left_to_run_forever() -> Non
 
 def test_deep_recursion_fails_safely_with_a_useful_error() -> None:
     source = "def f(n):\n    return f(n + 1)\nf(0)\n"
-    # Lowers Python's own recursion limit for the duration of this test,
-    # rather than just giving Tracer a bigger wall_clock_limit_s budget: an
-    # earlier version of this fix tried the latter (30.0s, reasoned from a
-    # single local timing of 1937/~2000 needed steps at the *old* 5.0s
-    # default) and *still* flaked on this repo's CI runners — full per-step
-    # frame/heap snapshotting is expensive enough that actually completing
-    # the ~2000 steps needed to hit Python's default recursion limit
-    # (~1000 frames) took 15.3s measured for real on a second run, nearly
-    # half the "generous" 30s budget, on hardware already faster than a
-    # shared CI runner is likely to be — any wall-clock margin is a bet on
-    # relative machine speed, which is exactly the kind of bet that made
-    # this test flake in the first place. `Tracer.run` never touches
-    # `sys.getrecursionlimit()` itself (it's whatever the calling process
-    # has), so capping it here to a small, fixed number makes this test
-    # need a small, fixed, hardware-independent number of steps instead —
-    # genuinely fast and deterministic rather than racing two limits.
-    original_limit = sys.getrecursionlimit()
-    sys.setrecursionlimit(200)
-    try:
-        trace = Tracer().run(source)
-    finally:
-        sys.setrecursionlimit(original_limit)
+    # Does NOT lower sys.setrecursionlimit() — tried that first, and it's
+    # actively unsafe here, not just a smaller-margin version of the same
+    # idea: CPython's recursion limit counts *every* Python-level frame in
+    # the process, and this tracer's own per-line instrumentation
+    # (sys.monitoring callback -> _on_line -> _record_step -> _snapshot ->
+    # per-value describe calls) adds several frames of its own on top of
+    # whatever pytest's own call stack already used before the test body
+    # even started. Confirmed for real on this repo's actual CI runner: a
+    # recursion limit of 200 left too little headroom for that bookkeeping
+    # to run at all, so `_on_raise`'s own attempt to *record* the
+    # RecursionError needed more stack than remained, cascading into a
+    # second exception mid-exception-handling and eventually a MemoryError
+    # (visible in the CI log as "Exception ignored in sys.unraisablehook")
+    # — a strictly worse failure than the one this test exists to catch.
+    #
+    # A generous wall_clock_limit_s is the safe knob instead: no job-level
+    # timeout is configured in .github/workflows/ci.yml (GitHub's own
+    # default is 6 hours), so a slow-but-correct test costs nothing here.
+    # 30.0s (an earlier attempt) turned out to still be a real gamble —
+    # measured directly, actually completing the ~2000 steps needed to
+    # reach Python's default recursion limit (~1000 frames) took 15.3s on
+    # this session's own dev machine, already faster than a shared,
+    # possibly-throttled CI runner should be assumed to be. 120.0s leaves
+    # roughly 8x that measured time as headroom.
+    trace = Tracer(wall_clock_limit_s=120.0).run(source)
 
     assert trace["status"] == "runtime_error"
     assert trace["error"]["type"] == "RecursionError"
