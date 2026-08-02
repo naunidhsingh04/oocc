@@ -50,7 +50,7 @@ export function FixturePicker() {
         value={fixtureName && isFixtureName(fixtureName) ? fixtureName : ""}
         onChange={handleChange}
         disabled={loading}
-        className="h-6 rounded-control border border-rule bg-panel px-1.5 font-mono-label text-[11px] text-ink"
+        className="h-6 max-w-[50vw] truncate rounded-control border border-rule bg-panel px-1.5 font-mono-label text-[11px] text-ink sm:max-w-none"
       >
         <option value="" disabled>
           {loading ? "Loading…" : "Choose a fixture…"}

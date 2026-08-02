@@ -49,7 +49,15 @@ export function PipelineStrip({ timings, failedStage, compiling, loadStage }: Pi
 
   return (
     <div
-      className="flex h-10 shrink-0 items-center gap-5 border-b border-rule bg-panel px-4"
+      // `min-h-10` + `flex-wrap` (not a fixed `h-10`, no-wrap) — four
+      // stages plus the load/compiling indicator measure ~425px, which a
+      // 375px viewport can't fit on one row. Without wrapping, the row
+      // didn't grow the page (AppShell's `overflow-y-auto` main resolves
+      // `overflow-x` to `auto` too per the CSS overflow spec, so the
+      // last stage was reachable only via a hidden horizontal swipe
+      // inside that region) — found live, not visible from a page-level
+      // scrollWidth check alone.
+      className="flex min-h-10 shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule bg-panel px-4 py-1.5"
       data-testid="compiler-pipeline-strip"
     >
       {STAGES.map((stage) => {

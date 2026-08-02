@@ -29,8 +29,14 @@ export function Toolbar() {
   }
 
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-rule bg-panel px-3">
-      <div className="flex items-center gap-2">
+    // `min-h-9` + `flex-wrap` (not a fixed `h-9`) — at narrow widths the
+    // fixture picker's <select> plus the run button and status chips
+    // don't fit one 36px row; a fixed height clipped the wrapped second
+    // line under the tab bar below instead of showing it (found live at
+    // 375px). Wrapping lets it grow to two rows there while staying a
+    // single row everywhere it already fit.
+    <div className="flex min-h-9 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-rule bg-panel px-3 py-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Button variant="primary" size="sm" onClick={handleRun} disabled={!hasTrace}>
           Run ▸
         </Button>
@@ -50,7 +56,7 @@ export function Toolbar() {
         {status && status !== "ok" ? <Chip tone={STATUS_TONE[status]}>{status}</Chip> : null}
         <AlgorithmBadge />
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <StdinDrawer />
         <FixturePicker />
       </div>

@@ -43,6 +43,11 @@ def get_provider_key(request: Request) -> ProviderKey:
     log-redaction scope (see app.logging) before wrapping it — the scrub
     must be armed before anything else in this request has a chance to log
     it, including this very dependency's own return."""
+    # Trimmed server-side too, not just by the frontend (lib/settings/store.ts)
+    # — a pasted key's trailing newline surviving into the header would
+    # otherwise make Gemini reject an otherwise-valid key with no
+    # indication the whitespace was the cause.
     raw = request.headers.get("x-provider-key")
-    bind_sensitive_value(raw)
-    return ProviderKey(_secret=SecretStr(raw) if raw else None)
+    stripped = raw.strip() if raw else None
+    bind_sensitive_value(stripped)
+    return ProviderKey(_secret=SecretStr(stripped) if stripped else None)

@@ -4,6 +4,7 @@ export {
   ChevronDownIcon,
   CloseIcon,
   CommandIcon,
+  MenuIcon,
   MoonIcon,
   PauseIcon,
   PlayIcon,

@@ -166,6 +166,11 @@ export function TraceRibbon() {
           {hoverInfo.change ? ` · ${hoverInfo.change}` : ""}
         </div>
       ) : null}
+      {!trace ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft">
+          Choose a fixture to see its trace ribbon
+        </div>
+      ) : null}
     </div>
   );
 }

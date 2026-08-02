@@ -9,3 +9,19 @@
 @source "../../../packages/ui/src/**/*.{ts,tsx}";
 
 @import "@oocc/ui/theme.css";
+
+/* iOS Safari auto-zooms the page on focusing any form control whose
+   computed font-size is under 16px — every text input/textarea/select in
+   this app is intentionally smaller than that for desktop density
+   (docs/PRD.md §6's dense-instrument-panel voice). Below the workspace's
+   own `md` breakpoint (components/workspace/Workspace.tsx's
+   `useMediaQuery("(max-width: 767px)")|NarrowWorkspace.tsx), force 16px on
+   focus so mobile typing doesn't yank the viewport into a zoomed state;
+   desktop keeps the smaller size untouched. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

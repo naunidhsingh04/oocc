@@ -143,6 +143,11 @@ export function ArrayPanel({ panel }: VizPanelProps) {
               comparingPair={isComparingStep ? comparing : null}
             />
           </>
+        ) : binding ? (
+          <EmptyState
+            title="Array not created yet"
+            description="Step forward — this array isn't in scope until the trace initializes it."
+          />
         ) : (
           <EmptyState title="No array in this trace" description="This fixture has no primitive list to visualize." />
         )}

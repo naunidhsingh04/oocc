@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
-import { cn, ErrorBoundary } from "@oocc/ui";
+import { cn, ErrorBoundary, Tabs, TabsList, TabsTrigger } from "@oocc/ui";
 import type { TickInfo } from "@/lib/player/ticks";
 import type { AstNode, BytecodeChunk, Token, VmStep } from "@/lib/compiler/types";
 import type { useCompilerPlayback } from "@/lib/compiler/usePlayback";
@@ -71,40 +71,23 @@ export function CompilerRightPane({ tokens, ast, bytecode, vmSteps, vmTicks, pla
 
   return (
     <div className="flex h-full flex-col rounded-panel border border-rule bg-panel shadow-raised">
-      <div
-        role="tablist"
-        aria-label="Compiler view"
-        className="flex h-11 shrink-0 items-center gap-1 border-b border-rule px-3"
-      >
-        {TABS.map((tab) => {
-          const isActive = tab.key === active;
-          return (
-            <button
+      <Tabs value={active} onValueChange={(value) => setActive(value as TabKey)}>
+        <TabsList aria-label="Compiler view" className="h-11 shrink-0 gap-1 px-3">
+          {TABS.map((tab) => (
+            <TabsTrigger
               key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => setActive(tab.key)}
+              value={tab.key}
               className={cn(
-                "relative rounded-control px-3 py-2 font-body text-[13px] font-semibold transition-colors duration-150",
-                "hover:text-ink active:scale-[0.97]",
-                !isActive && "text-ink-soft",
+                "rounded-control px-3 py-2 text-[13px] font-semibold data-[state=active]:text-(--tab-accent)",
+                "active:scale-[0.97]",
               )}
-              style={isActive ? { color: tab.color } : undefined}
+              style={{ "--tab-accent": tab.color } as React.CSSProperties}
             >
               {tab.label}
-              {isActive ? (
-                <motion.span
-                  layoutId="compiler-tab-underline"
-                  className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
-                  style={{ backgroundColor: tab.color }}
-                  transition={{ duration, ease: "easeOut" }}
-                />
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {/* A thin accent line names which stage the visible pane belongs to. */}
       <div aria-hidden className="h-0.5 shrink-0" style={{ backgroundColor: activeTab.color }} />
       <div className="relative min-h-0 flex-1 overflow-hidden">

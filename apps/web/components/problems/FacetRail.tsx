@@ -14,6 +14,11 @@ export interface FacetRailProps {
   onChange: (next: ProblemListState) => void;
   tags: string[];
   counts: { total: number; filtered: number };
+  /** Full-width, no right border — the narrow-viewport collapsible variant
+   * (see app/problems/page.tsx) swaps this in for the fixed `w-48` aside
+   * that otherwise ate half of a 375px screen before the table even got a
+   * turn at the remaining width. */
+  className?: string;
 }
 
 function FacetGroup({ title, children }: { title: string; children: React.ReactNode }) {
@@ -35,12 +40,17 @@ function FacetCheckbox({
   onToggle: () => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 py-0.5 font-body text-[13px] text-ink">
+    // `min-h-11` (44px, Apple/Google's tap-target floor) below `md` — the
+    // 14px checkbox plus 2px vertical padding this row used unconditionally
+    // measured well under half that on a touch screen; the label still
+    // wraps the input, so the full 44px row toggles it, not just the tiny
+    // box. `md:min-h-0` returns to the original dense desktop row.
+    <label className="flex min-h-11 cursor-pointer items-center gap-2 py-0.5 font-body text-[13px] text-ink md:min-h-0">
       <input
         type="checkbox"
         checked={checked}
         onChange={onToggle}
-        className={cn("h-3.5 w-3.5 accent-signal", "rounded-[2px]")}
+        className={cn("h-3.5 w-3.5 shrink-0 accent-signal", "rounded-[2px]")}
       />
       {label}
     </label>
@@ -50,9 +60,9 @@ function FacetCheckbox({
 /** Faceted filters, left rail (docs/PRD.md Phase 4 frontend brief). Every
  * change writes straight through `onChange` -> the page's URL-synced
  * state — this component holds no state of its own. */
-export function FacetRail({ state, onChange, tags, counts }: FacetRailProps) {
+export function FacetRail({ state, onChange, tags, counts, className }: FacetRailProps) {
   return (
-    <aside className="w-48 shrink-0 overflow-y-auto border-r border-rule bg-panel">
+    <aside className={cn("w-48 shrink-0 overflow-y-auto border-r border-rule bg-panel", className)}>
       <div className="border-b border-rule px-3 py-2.5 font-body text-[13px] font-medium text-ink-soft">
         {counts.filtered} of {counts.total} problems
       </div>

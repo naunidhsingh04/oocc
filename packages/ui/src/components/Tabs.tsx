@@ -18,11 +18,13 @@ export const Tabs = RadixTabs.Root;
  */
 export function TabsList({ className, children, ...props }: React.ComponentProps<typeof RadixTabs.List>) {
   const listRef = useRef<HTMLDivElement | null>(null);
-  const [rect, setRect] = useState<{ left: number; width: number } | null>(null);
+  const [rect, setRect] = useState<{ left: number; width: number; accent: string | null } | null>(null);
 
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
+
+    let triggerResizeObserver: ResizeObserver | null = null;
 
     function measure() {
       const active = list?.querySelector<HTMLElement>('[data-state="active"]');
@@ -30,17 +32,41 @@ export function TabsList({ className, children, ...props }: React.ComponentProps
         setRect(null);
         return;
       }
-      setRect({ left: active.offsetLeft, width: active.offsetWidth });
+      // An individual trigger may opt the underline into its own accent
+      // color via `style={{ "--tab-accent": ... }}` (docs/PRD.md §6's
+      // per-stage tab colors) — falls back to the default signal color.
+      const accent = active.style.getPropertyValue("--tab-accent") || null;
+      setRect({ left: active.offsetLeft, width: active.offsetWidth, accent });
+
+      // Re-observe per-trigger: a trigger's own width can change (label
+      // text change, e.g. dynamic tab counts) without the list's outer
+      // box changing, which the list-level ResizeObserver alone misses.
+      triggerResizeObserver?.disconnect();
+      triggerResizeObserver = new ResizeObserver(measure);
+      for (const trigger of list.querySelectorAll<HTMLElement>('[role="tab"]')) {
+        triggerResizeObserver.observe(trigger);
+      }
     }
 
     measure();
+    // childList/characterData (not just the `data-state` attribute) so a
+    // label's text changing, or tabs being added/removed, re-measures too.
     const mutationObserver = new MutationObserver(measure);
-    mutationObserver.observe(list, { attributes: true, attributeFilter: ["data-state"], subtree: true });
+    mutationObserver.observe(list, {
+      attributes: true,
+      attributeFilter: ["data-state"],
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
     const resizeObserver = new ResizeObserver(measure);
     resizeObserver.observe(list);
+    // Web fonts swapping in after first paint shift measured text widths.
+    document.fonts?.ready.then(measure).catch(() => {});
     return () => {
       mutationObserver.disconnect();
       resizeObserver.disconnect();
+      triggerResizeObserver?.disconnect();
     };
   }, [children]);
 
@@ -54,8 +80,15 @@ export function TabsList({ className, children, ...props }: React.ComponentProps
       {rect ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute -bottom-px h-0.5 rounded-full bg-signal transition-[transform,width] duration-150 ease-out"
-          style={{ width: rect.width, transform: `translateX(${rect.left}px)` }}
+          className={cn(
+            "pointer-events-none absolute -bottom-px h-0.5 rounded-full transition-[transform,width] duration-150 ease-out",
+            !rect.accent && "bg-signal",
+          )}
+          style={{
+            width: rect.width,
+            transform: `translateX(${rect.left}px)`,
+            backgroundColor: rect.accent ?? undefined,
+          }}
         />
       ) : null}
     </RadixTabs.List>

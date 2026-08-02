@@ -73,11 +73,11 @@ export function Workspace() {
           <ResizablePane id="panels" defaultSize="45" minSize="20" data-tour="panels">
             {hasComplexity || hasInsights ? (
               <ResizableSplit id="oocc-panels-extras" orientation="vertical">
-                <ResizablePane id="panel-grid" defaultSize="60" minSize="30">
+                <ResizablePane id="panel-grid" defaultSize="72" minSize="40">
                   <PanelGrid plan={plan} storageKey={storageKey} />
                 </ResizablePane>
                 <ResizableHandle />
-                <ResizablePane id="extras" defaultSize="40" minSize="15">
+                <ResizablePane id="extras" defaultSize="28" minSize="15">
                   {hasComplexity && hasInsights ? (
                     <ResizableSplit id="oocc-complexity-insights" orientation="horizontal">
                       <ResizablePane id="complexity" defaultSize="50" minSize="20">
