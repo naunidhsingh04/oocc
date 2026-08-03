@@ -48,8 +48,10 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Route changes should close the mobile menu, not leave it open over
-  // the newly-navigated page.
+  // the newly-navigated page — a UI-state reset driven by navigation, not
+  // state derived from props/state React could compute during render.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuOpen(false);
   }, [pathname]);
 

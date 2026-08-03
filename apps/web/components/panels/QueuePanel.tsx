@@ -47,6 +47,11 @@ export function QueuePanel({ panel }: VizPanelProps) {
             })
           )}
         </div>
+      ) : binding ? (
+        <EmptyState
+          title="Queue not created yet"
+          description="Step forward — this list isn't in scope until the trace initializes it."
+        />
       ) : (
         <EmptyState title="No queue in this trace" description="This fixture has no list to visualize as a queue." />
       )}

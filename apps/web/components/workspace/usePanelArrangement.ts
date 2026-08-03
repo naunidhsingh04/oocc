@@ -4,6 +4,68 @@ import type { Panel as PlanPanelNode, PanelType, VizPlan } from "@oocc/contracts
 import { useEffect, useMemo, useState } from "react";
 import { PANEL_TYPES } from "./panelRegistry";
 
+/** How many panels a fresh (never-customized) arrangement mounts by
+ * default — everything else the plan suggested is still one click away
+ * via "+ Add panel", not gone. A BFS trace's real `viz_planner` output is
+ * six panels (graph, array, queue, call_stack, variables, console); all
+ * six mounting at once left five of them ~50px slivers of a title bar
+ * with no visible body (found live, docs/PRD.md §6.4's own mockup shows
+ * three panels total: one primary + a two-up secondary row). */
+const DEFAULT_PANEL_COUNT = 3;
+
+/** Ranks *secondary* panel types by how likely they are to be the actual
+ * point of a given trace, highest first — used only to choose which two
+ * secondaries join the primary panel in a fresh default arrangement.
+ * Container types that directly explain an algorithm's mechanism (a BFS's
+ * queue, a DFS's stack, a hash map's buckets) rank above the generic
+ * `array` binding a plan sometimes emits alongside them (frequently a
+ * secondary, less central artifact — e.g. BFS's own `order` list — not
+ * the thing worth defaulting to), which ranks above the always-present,
+ * debug-oriented `call_stack`/`variables` pair every plan includes
+ * regardless of algorithm. `console` sits between those two groups: not
+ * algorithm-specific, but broadly more informative by default than a
+ * call stack that's one frame deep for an iterative trace. */
+const SECONDARY_PANEL_PRIORITY: readonly PanelType[] = [
+  "queue",
+  "stack",
+  "hash_map",
+  "linked_list",
+  "binary_tree",
+  "array_2d",
+  "recursion_tree",
+  "heap_objects",
+  "graph",
+  "console",
+  "array",
+  "call_stack",
+  "variables",
+  "timeline",
+];
+
+function panelPriority(type: PanelType): number {
+  const index = SECONDARY_PANEL_PRIORITY.indexOf(type);
+  return index === -1 ? SECONDARY_PANEL_PRIORITY.length : index;
+}
+
+/** Caps a *freshly seeded* panel list (never a restored/user-customized
+ * one — see the two call sites below) to `DEFAULT_PANEL_COUNT`: the
+ * primary panel always survives, the highest-priority secondaries fill
+ * the remaining slots, original relative order preserved among the kept
+ * ones (so a plan's own panel order still reads top-to-bottom sensibly). */
+function selectDefaultPanels(panels: PlanPanelNode[]): PlanPanelNode[] {
+  if (panels.length <= DEFAULT_PANEL_COUNT) return panels;
+  const primary = panels.find((p) => p.role === "primary");
+  const secondarySlots = DEFAULT_PANEL_COUNT - (primary ? 1 : 0);
+  const secondaries = panels.filter((p) => p.id !== primary?.id);
+  const keepIds = new Set(
+    [...secondaries]
+      .sort((a, b) => panelPriority(a.type) - panelPriority(b.type))
+      .slice(0, secondarySlots)
+      .map((p) => p.id),
+  );
+  return panels.filter((p) => p.id === primary?.id || keepIds.has(p.id));
+}
+
 /** No detected structures and no plan at all (e.g. a fixture whose backend
  * output hasn't loaded) still needs *something* to mount — the two panels
  * every program has regardless of algorithm. */
@@ -115,7 +177,9 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   // the real stored value right after — it just used to be redundant
   // with the initializer instead of being the *only* source of the real
   // value.
-  const [panels, setPanels] = useState<PlanPanelNode[]>(() => dedupePanelIds(seedPlan.panels));
+  const [panels, setPanels] = useState<PlanPanelNode[]>(() =>
+    dedupePanelIds(selectDefaultPanels(seedPlan.panels)),
+  );
   const [maximizedId, setMaximizedId] = useState<string | null>(null);
 
   // Re-seed whenever the underlying run changes, not on every plan object
@@ -127,8 +191,11 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
   // client-only, always after mount, never during render.
   useEffect(() => {
     const stored = loadStored(storageKey);
+    // A restored arrangement is whatever the user actually left it as
+    // (including having added panels back past the default cap) — only a
+    // genuinely fresh seed from the plan gets capped.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPanels(dedupePanelIds(stored?.panels ?? seedPlan.panels));
+    setPanels(dedupePanelIds(stored?.panels ?? selectDefaultPanels(seedPlan.panels)));
     setMaximizedId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
@@ -158,6 +225,16 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
     );
   };
 
+  /** Back to the smart default set of panels (see `selectDefaultPanels`)
+   * — undoes any add/remove/retype customization for this run. Pane
+   * *sizes* within the grid aren't independently persisted (only which
+   * panels exist is — see the sessionStorage write above), so resetting
+   * this array is the whole of "reset layout" for this panel grid. */
+  const resetLayout = () => {
+    setPanels(dedupePanelIds(selectDefaultPanels(seedPlan.panels)));
+    setMaximizedId(null);
+  };
+
   const availableTypes = useMemo(() => PANEL_TYPES, []);
 
   return {
@@ -166,6 +243,7 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
     addPanel,
     removePanel,
     retypePanel,
+    resetLayout,
     maximizedId,
     setMaximizedId,
     availableTypes,

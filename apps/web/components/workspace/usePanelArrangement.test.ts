@@ -12,7 +12,7 @@ const PLAN: VizPlan = {
 };
 
 beforeEach(() => {
-  window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 describe("usePanelArrangement", () => {
@@ -41,7 +41,7 @@ describe("usePanelArrangement", () => {
     expect(result.current.panels.some((p) => p.id === "p2")).toBe(false);
   });
 
-  it("persists arrangement to localStorage keyed by storageKey, and restores it", () => {
+  it("persists arrangement to sessionStorage keyed by storageKey, and restores it", () => {
     const { result, unmount } = renderHook(() => usePanelArrangement(PLAN, "persist-key"));
     act(() => result.current.addPanel("console"));
     const afterAdd = result.current.panels;
@@ -65,7 +65,7 @@ describe("usePanelArrangement", () => {
   it("never reassigns an existing local-N id after a fresh mount restores a persisted arrangement", () => {
     // Simulates a real page reload: the hook's own module state doesn't
     // carry over (a brand-new renderHook stands in for that), but
-    // localStorage does. A counter that only lived in memory would reset
+    // sessionStorage does. A counter that only lived in memory would reset
     // to `local-1` here and collide with the one already persisted —
     // exactly the bug that crashed `/play` in production with
     // `react-resizable-panels`' "Panel ids must be unique."
@@ -86,11 +86,11 @@ describe("usePanelArrangement", () => {
   it("repairs an already-corrupted stored arrangement instead of crashing on load", () => {
     // A browser that hit the collision bug *before* the fix above has a
     // real duplicate-id arrangement already sitting in its own
-    // localStorage — restoring it verbatim would reproduce the exact same
+    // sessionStorage — restoring it verbatim would reproduce the exact same
     // `react-resizable-panels` crash on the very next page load, with no
     // `addPanel` call involved. This is the recovery path for that
     // already-corrupted data, not just prevention of new corruption.
-    window.localStorage.setItem(
+    window.sessionStorage.setItem(
       "oocc.panel-arrangement.corrupt-key",
       JSON.stringify({
         panels: [

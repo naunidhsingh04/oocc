@@ -2,9 +2,18 @@
 
 import type { Panel as PlanPanelNode, PanelType, VizPlan } from "@oocc/contracts";
 import { ResizableHandle, ResizablePane, ResizableSplit } from "@oocc/ui";
+import { useEffect, useRef, useState } from "react";
 import { PANEL_LABELS, PANEL_TYPES } from "./panelRegistry";
 import { PanelFrame } from "./PanelFrame";
 import { usePanelArrangement } from "./usePanelArrangement";
+
+/** Every panel gets at least this much room — enough for a header plus a
+ * few rows of real content — or the column scrolls instead of shrinking
+ * any panel further (docs/PRD.md §6.4's own mockup panels are never just
+ * a title bar; found live, five secondary panels compressed into ~50px
+ * slivers with nothing but a header visible was the direct complaint this
+ * fixes). */
+const MIN_PANEL_HEIGHT_PX = 180;
 
 interface PanelGridProps {
   plan: VizPlan | null;
@@ -29,16 +38,15 @@ interface Arrangement {
 
 /**
  * The layout engine (docs/PRD.md §4.3 Phase 2 frontend spec item 3): mounts
- * panels straight from viz_planner's plan via the panel registry, and lets
- * the user add/remove/retype/maximize any panel, persisting the result.
- * `layout: "primary+stack"` renders literally as a primary column plus a
- * stacked column of everything else; any other layout string (today just
- * `"meta"`) renders as one flat stack — panels butt against shared
- * hairlines either way (PRD §6.2), react-resizable-panels' own handles are
- * the only visual seam.
+ * a small default set of panels straight from viz_planner's plan (see
+ * usePanelArrangement's `selectDefaultPanels`) via the panel registry, and
+ * lets the user add/remove/retype/maximize any panel, persisting the
+ * result. `layout: "primary+stack"` renders literally as a primary column
+ * plus a stacked column of everything else; any other layout string
+ * (today just `"meta"`) renders as one flat stack.
  */
 export function PanelGrid({ plan, storageKey, forceStacked = false }: PanelGridProps) {
-  const { panels, layout, addPanel, removePanel, retypePanel, maximizedId, setMaximizedId, availableTypes } =
+  const { panels, layout, addPanel, removePanel, retypePanel, resetLayout, maximizedId, setMaximizedId, availableTypes } =
     usePanelArrangement(plan, storageKey);
   const arrangement: Arrangement = { availableTypes, removePanel, retypePanel, setMaximizedId };
 
@@ -63,7 +71,14 @@ export function PanelGrid({ plan, storageKey, forceStacked = false }: PanelGridP
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-end border-b border-rule px-2 py-1">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-b border-rule px-2 py-1">
+        <button
+          type="button"
+          onClick={resetLayout}
+          className="rounded-control px-1.5 py-0.5 font-mono-label text-[11px] text-ink-soft hover:bg-raised hover:text-ink"
+        >
+          Reset layout
+        </button>
         <AddPanelControl onAdd={addPanel} />
       </div>
       <div className="min-h-0 flex-1">
@@ -100,6 +115,20 @@ export function PanelGrid({ plan, storageKey, forceStacked = false }: PanelGridP
   );
 }
 
+/**
+ * A vertical stack of resizable panels, each held to `MIN_PANEL_HEIGHT_PX`
+ * or more. `react-resizable-panels` sizes its group to 100% of its own
+ * container by default, which is exactly the bug this replaces: five
+ * panels squeezed into whatever height the container happened to have,
+ * each shrinking well under a usable size with no floor. Instead, the
+ * group is given an explicit pixel height of
+ * `max(measured container height, panelCount * MIN_PANEL_HEIGHT_PX)` — so
+ * it still fills the available space when there's room for everyone, but
+ * grows *past* 100% (and the wrapping `overflow-y-auto` scrolls) the
+ * moment there isn't. Each pane's own `minSize` is computed against that
+ * same group height, so it always resolves to exactly the pixel floor
+ * regardless of panel count.
+ */
 function PanelStack({
   panels,
   splitId,
@@ -109,29 +138,62 @@ function PanelStack({
   splitId: string;
   arrangement: Arrangement;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [availableHeight, setAvailableHeight] = useState(0);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const height = entries[0]?.contentRect.height;
+      if (height !== undefined) setAvailableHeight(height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const groupHeight = Math.max(availableHeight, panels.length * MIN_PANEL_HEIGHT_PX);
+  const minSizePct = (MIN_PANEL_HEIGHT_PX / groupHeight) * 100;
+  const defaultSizePct = 100 / panels.length;
+
   return (
-    <ResizableSplit id={splitId} orientation="vertical">
-      {panels.map((panel, i) => (
-        <FramedPane key={panel.id} panel={panel} isLast={i === panels.length - 1} total={panels.length} arrangement={arrangement} />
-      ))}
-    </ResizableSplit>
+    <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto">
+      <ResizableSplit
+        id={splitId}
+        orientation="vertical"
+        style={{ height: groupHeight, minHeight: groupHeight }}
+      >
+        {panels.map((panel, i) => (
+          <FramedPane
+            key={panel.id}
+            panel={panel}
+            isLast={i === panels.length - 1}
+            defaultSize={defaultSizePct}
+            minSize={minSizePct}
+            arrangement={arrangement}
+          />
+        ))}
+      </ResizableSplit>
+    </div>
   );
 }
 
 function FramedPane({
   panel,
   isLast,
-  total,
+  defaultSize,
+  minSize,
   arrangement,
 }: {
   panel: PlanPanelNode;
   isLast: boolean;
-  total: number;
+  defaultSize: number;
+  minSize: number;
   arrangement: Arrangement;
 }) {
   return (
     <>
-      <ResizablePane id={panel.id} defaultSize={String(Math.round(100 / total))} minSize="15">
+      <ResizablePane id={panel.id} defaultSize={`${defaultSize}%`} minSize={`${minSize}%`}>
         <PanelFrame
           panel={panel}
           availableTypes={arrangement.availableTypes}
@@ -141,7 +203,7 @@ function FramedPane({
           onToggleMaximize={() => arrangement.setMaximizedId(panel.id)}
         />
       </ResizablePane>
-      {!isLast ? <ResizableHandle /> : null}
+      {!isLast ? <ResizableHandle orientation="vertical" /> : null}
     </>
   );
 }

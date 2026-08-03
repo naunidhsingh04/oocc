@@ -26,7 +26,6 @@ export interface PendingSelection {
 
 export interface TutorState {
   collapsed: boolean;
-  height: number;
   messages: TutorMessage[];
   composerText: string;
   contextChips: ContextChip[];
@@ -40,7 +39,6 @@ export interface TutorState {
 
   toggleCollapsed: () => void;
   setCollapsed: (collapsed: boolean) => void;
-  setHeight: (height: number) => void;
   setComposerText: (text: string) => void;
   addContextChip: (chip: ContextChip) => void;
   removeContextChip: (id: string) => void;
@@ -71,7 +69,6 @@ export const useTutorStore = create<TutorState>()((set, get) => ({
   // sitting at a 260px default height was most of the lower half of a
   // 1440x900 screen with nothing in it).
   collapsed: true,
-  height: 260,
   messages: [],
   composerText: "",
   contextChips: [],
@@ -80,7 +77,6 @@ export const useTutorStore = create<TutorState>()((set, get) => ({
 
   toggleCollapsed: () => set((state) => ({ collapsed: !state.collapsed })),
   setCollapsed: (collapsed) => set({ collapsed }),
-  setHeight: (height) => set({ height: Math.max(140, Math.min(640, height)) }),
   setComposerText: (text) => set({ composerText: text }),
   addContextChip: (chip) => set((state) => ({ contextChips: [...state.contextChips, chip] })),
   removeContextChip: (id) =>

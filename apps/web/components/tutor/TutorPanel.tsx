@@ -3,7 +3,7 @@
 import { usePlayerStore } from "@/lib/player";
 import { useTutorStore } from "@/lib/tutor/store";
 import { Button } from "@oocc/ui";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { TutorTranscript } from "./TutorTranscript";
 
 /**
@@ -58,43 +58,15 @@ function CollapsedComposer() {
 export function TutorPanel() {
   const collapsed = useTutorStore((state) => state.collapsed);
   const toggleCollapsed = useTutorStore((state) => state.toggleCollapsed);
-  const height = useTutorStore((state) => state.height);
-  const setHeight = useTutorStore((state) => state.setHeight);
   const streaming = useTutorStore((state) => state.streaming);
   const fixtureName = usePlayerStore((state) => state.fixtureName);
-
-  const resizingRef = useRef(false);
 
   useEffect(() => {
     useTutorStore.getState().clearForNewRun();
   }, [fixtureName]);
 
-  function startResize(event: React.PointerEvent) {
-    event.preventDefault();
-    resizingRef.current = true;
-    const startY = event.clientY;
-    const startHeight = height;
-
-    function onMove(moveEvent: PointerEvent) {
-      if (!resizingRef.current) return;
-      setHeight(startHeight - (moveEvent.clientY - startY));
-    }
-    function onUp() {
-      resizingRef.current = false;
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    }
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  }
-
   return (
-    <div className="flex shrink-0 flex-col border-t border-rule bg-panel" data-tour="tutor">
-      <div
-        onPointerDown={collapsed ? undefined : startResize}
-        className={collapsed ? "" : "h-1 w-full cursor-row-resize hover:bg-signal"}
-        data-testid="tutor-resize-handle"
-      />
+    <div className="flex h-full min-h-0 flex-col border-t border-rule bg-panel" data-tour="tutor">
       <button
         type="button"
         onClick={toggleCollapsed}
@@ -112,7 +84,7 @@ export function TutorPanel() {
       {collapsed ? (
         <CollapsedComposer />
       ) : (
-        <div className="flex min-h-0 flex-col" style={{ height }}>
+        <div className="flex min-h-0 flex-1 flex-col">
           <TutorTranscript />
         </div>
       )}

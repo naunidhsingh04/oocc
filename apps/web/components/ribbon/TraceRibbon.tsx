@@ -5,17 +5,16 @@ import { useTheme } from "@/lib/theme/ThemeProvider";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readRibbonColors } from "./colors";
 import { describeChange } from "./describeChange";
-import { bracketAreaHeight, drawRibbon, hitTestBracket } from "./draw";
+import { drawRibbon, hitTestBracket } from "./draw";
 import { computeTickBins, xToStep } from "./tickBins";
 
-const RIBBON_HEIGHT = 48;
-// The ribbon is a thin strip pinned above the tutor (docs/PRD.md §6.4's own
-// mockup shows it as a single dense row, not a headline element) — capped
-// so a deeply-nested fixture's bracket rows can't inflate it into a third
-// of the screen the way an uncapped `RIBBON_HEIGHT + bracketAreaHeight(...)`
-// did (found live: bubble_sort's two nested loops alone pushed it past
-// 110px before this cap).
-const MAX_RIBBON_HEIGHT = 80;
+// Fallback only, used for one frame before the container's real height is
+// ever measured (see `containerHeight` below) — the ribbon now lives in
+// its own user-resizable pane (Workspace.tsx's vertical split) and fills
+// whatever height that pane is actually given, rather than computing one
+// itself. That's also what makes the pane draggable in a way that's
+// visible: a self-computed height would just get overridden every render.
+const FALLBACK_RIBBON_HEIGHT = 70;
 
 /**
  * The signature element (docs/PRD.md §6.3): a full-width, canvas-rendered
@@ -28,6 +27,7 @@ export function TraceRibbon() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(0);
   const [hoverStep, setHoverStep] = useState<number | null>(null);
   const { resolvedTheme } = useTheme();
 
@@ -46,8 +46,10 @@ export function TraceRibbon() {
     const el = containerRef.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (width !== undefined) setContainerWidth(width);
+      const rect = entries[0]?.contentRect;
+      if (rect === undefined) return;
+      setContainerWidth(rect.width);
+      setContainerHeight(rect.height);
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -55,7 +57,7 @@ export function TraceRibbon() {
 
   const bins = useMemo(() => computeTickBins(ticks, containerWidth), [ticks, containerWidth]);
   const maxDepth = useMemo(() => ticks.reduce((max, t) => Math.max(max, t.depth), 0), [ticks]);
-  const height = Math.min(RIBBON_HEIGHT + bracketAreaHeight(loopBrackets), MAX_RIBBON_HEIGHT);
+  const height = containerHeight || FALLBACK_RIBBON_HEIGHT;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -142,12 +144,7 @@ export function TraceRibbon() {
   }, [hoverStep, trace]);
 
   return (
-    <div
-      ref={containerRef}
-      data-tour="ribbon"
-      className="relative w-full shrink-0 border-t border-rule bg-paper"
-      style={{ height }}
-    >
+    <div ref={containerRef} data-tour="ribbon" className="relative min-h-0 w-full flex-1 border-t border-rule bg-paper">
       <canvas
         ref={canvasRef}
         tabIndex={0}
