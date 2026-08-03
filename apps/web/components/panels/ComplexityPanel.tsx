@@ -68,21 +68,36 @@ export function ComplexityPanel() {
   return (
     <Panel title="Complexity" className="min-h-0 flex-1" bodyClassName="p-4">
       <div className="flex h-full flex-col gap-2">
-        <svg data-testid="complexity-scatter" width={WIDTH} height={HEIGHT} className="block">
-          <line x1={PADDING} y1={HEIGHT - PADDING} x2={WIDTH - PADDING} y2={HEIGHT - PADDING} stroke="var(--color-rule)" />
-          <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT - PADDING} stroke="var(--color-rule)" />
-          <path d={curvePath} fill="none" stroke="var(--color-signal)" strokeWidth={1.5} />
-          {points.map((p, i) => (
-            <circle
-              key={i}
-              data-testid={`complexity-point-${p.shape}-${p.n}`}
-              cx={xScale(p.n)}
-              cy={yScale(p.stepCount)}
-              r={3.5}
-              fill={SHAPE_MARKERS[p.shape] ?? "var(--color-ink-soft)"}
-            />
-          ))}
-        </svg>
+        {/* A hardcoded `width`/`height` here used to render a fixed
+            320x200 box regardless of how much room the panel actually
+            had — on a wide desktop pane that left most of it empty grey
+            space (found live: "the visualization area shows mostly
+            empty grey rows" traced back to this exact element). `viewBox`
+            keeps the same internal coordinate math (xScale/yScale still
+            work in the 320x200 space) while `w-full h-full` + `preserveAspectRatio`
+            let the rendered box actually fill its container. */}
+        <div className="min-h-0 flex-1">
+          <svg
+            data-testid="complexity-scatter"
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            preserveAspectRatio="xMidYMid meet"
+            className="block h-full w-full"
+          >
+            <line x1={PADDING} y1={HEIGHT - PADDING} x2={WIDTH - PADDING} y2={HEIGHT - PADDING} stroke="var(--color-rule)" />
+            <line x1={PADDING} y1={PADDING} x2={PADDING} y2={HEIGHT - PADDING} stroke="var(--color-rule)" />
+            <path d={curvePath} fill="none" stroke="var(--color-signal)" strokeWidth={1.5} />
+            {points.map((p, i) => (
+              <circle
+                key={i}
+                data-testid={`complexity-point-${p.shape}-${p.n}`}
+                cx={xScale(p.n)}
+                cy={yScale(p.stepCount)}
+                r={3.5}
+                fill={SHAPE_MARKERS[p.shape] ?? "var(--color-ink-soft)"}
+              />
+            ))}
+          </svg>
+        </div>
         {/* docs/PRD.md §9: color alone can't distinguish the four input
             shapes — a text legend pairs each swatch with its name. */}
         <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono-label text-[10px] uppercase tracking-[0.04em] text-ink-soft">

@@ -65,7 +65,12 @@ export function makeContextChipId(): string {
  * panel collapse/reset independently of the trace itself.
  */
 export const useTutorStore = create<TutorState>()((set, get) => ({
-  collapsed: false,
+  // docs/PRD.md §6.4's own mockup shows the tutor as a single input row,
+  // not a half-screen drawer — it should earn its space by being asked
+  // something, not claim it by default (found live: an empty transcript
+  // sitting at a 260px default height was most of the lower half of a
+  // 1440x900 screen with nothing in it).
+  collapsed: true,
   height: 260,
   messages: [],
   composerText: "",
@@ -124,6 +129,10 @@ export const useTutorStore = create<TutorState>()((set, get) => ({
       composerText: "",
       contextChips: [],
       streaming: true,
+      // Asking a real question is what earns the tutor its space —
+      // expand from the single collapsed input row so the answer is
+      // actually visible the moment it starts streaming in.
+      collapsed: false,
     }));
 
     function updateAssistant(patch: Partial<TutorMessage>) {

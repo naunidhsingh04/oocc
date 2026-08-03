@@ -6,7 +6,7 @@ import { InsightsPanel } from "@/components/insights/InsightsPanel";
 import { NarrationStrip } from "@/components/narration/NarrationStrip";
 import { TraceRibbon } from "@/components/ribbon/TraceRibbon";
 import { TutorPanel } from "@/components/tutor/TutorPanel";
-import { usePlaybackClock, usePlayerStore } from "@/lib/player";
+import { useSessionPersistence, usePlaybackClock, usePlayerStore } from "@/lib/player";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { ResizableHandle, ResizablePane, ResizableSplit, Stagger, StaggerItem } from "@oocc/ui";
 import { useDefaultLayout } from "react-resizable-panels";
@@ -33,6 +33,7 @@ import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 export function Workspace() {
   usePlaybackClock();
   useKeyboardShortcuts();
+  useSessionPersistence();
   const isNarrow = useMediaQuery("(max-width: 767px)");
 
   const plan = usePlayerStore((state) => state.plan);
@@ -46,11 +47,14 @@ export function Workspace() {
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({
     id: "oocc-workspace-main",
     panelIds: ["editor", "panels"],
-    // useDefaultLayout's own default reads the bare `localStorage` global,
-    // which doesn't exist during Next's server render pass — this is a
-    // client component, but Next still does one SSR pass for the initial
-    // HTML, so an explicit no-op stub is needed there.
-    storage: typeof window === "undefined" ? { getItem: () => null, setItem: () => {} } : window.localStorage,
+    // `sessionStorage`, not `localStorage` — this layout is per-tab
+    // session state (docs/PRD.md's "fresh start every visit" session
+    // model), not a cross-visit preference. `useDefaultLayout`'s own
+    // default reads the bare `localStorage` global, which doesn't exist
+    // during Next's server render pass — this is a client component, but
+    // Next still does one SSR pass for the initial HTML, so an explicit
+    // no-op stub is needed there either way.
+    storage: typeof window === "undefined" ? { getItem: () => null, setItem: () => {} } : window.sessionStorage,
   });
 
   if (isNarrow) return <NarrowWorkspace />;

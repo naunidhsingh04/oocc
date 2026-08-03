@@ -20,6 +20,12 @@ export function InsightsPanel() {
   const narrations = usePlayerStore((state) => state.narration.insights);
   const jumpToStepRef = usePlayerStore((state) => state.jumpToStepRef);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // The whole panel starts as a one-line summary, not just its severity
+  // subgroups — a full-height empty-looking box for "0 findings" (the
+  // common case) was exactly the kind of dead space the layout rebalance
+  // was about removing. Any findings still collapse by default; expanding
+  // is one click on the summary line either way.
+  const [expanded, setExpanded] = useState(false);
 
   const groups = groupInsightsBySeverity(insights, narrations);
 
@@ -32,9 +38,26 @@ export function InsightsPanel() {
     });
   }
 
+  const summary =
+    insights.length === 0 ? "No findings" : `${insights.length} finding${insights.length === 1 ? "" : "s"}`;
+
   return (
-    <Panel title="Insights" className="min-h-0 flex-1" bodyClassName="overflow-auto p-2">
-      {insights.length === 0 ? (
+    <Panel
+      title="Insights"
+      className={expanded ? "min-h-0 flex-1" : "shrink-0"}
+      bodyClassName={expanded ? "overflow-auto p-2" : "p-0"}
+      actions={
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="font-mono-label text-[11px] uppercase tracking-[0.06em] text-ink-soft hover:text-ink"
+        >
+          {summary} {expanded ? "▾" : "▸"}
+        </button>
+      }
+    >
+      {!expanded ? null : insights.length === 0 ? (
         <EmptyState title="No findings" description="The deterministic scanners found nothing to flag in this run." />
       ) : (
         <div className="flex flex-col gap-2" data-testid="insights-groups">

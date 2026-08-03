@@ -8,7 +8,14 @@ import { describeChange } from "./describeChange";
 import { bracketAreaHeight, drawRibbon, hitTestBracket } from "./draw";
 import { computeTickBins, xToStep } from "./tickBins";
 
-const RIBBON_HEIGHT = 96;
+const RIBBON_HEIGHT = 48;
+// The ribbon is a thin strip pinned above the tutor (docs/PRD.md §6.4's own
+// mockup shows it as a single dense row, not a headline element) — capped
+// so a deeply-nested fixture's bracket rows can't inflate it into a third
+// of the screen the way an uncapped `RIBBON_HEIGHT + bracketAreaHeight(...)`
+// did (found live: bubble_sort's two nested loops alone pushed it past
+// 110px before this cap).
+const MAX_RIBBON_HEIGHT = 80;
 
 /**
  * The signature element (docs/PRD.md §6.3): a full-width, canvas-rendered
@@ -48,7 +55,7 @@ export function TraceRibbon() {
 
   const bins = useMemo(() => computeTickBins(ticks, containerWidth), [ticks, containerWidth]);
   const maxDepth = useMemo(() => ticks.reduce((max, t) => Math.max(max, t.depth), 0), [ticks]);
-  const height = RIBBON_HEIGHT + bracketAreaHeight(loopBrackets);
+  const height = Math.min(RIBBON_HEIGHT + bracketAreaHeight(loopBrackets), MAX_RIBBON_HEIGHT);
 
   useEffect(() => {
     const canvas = canvasRef.current;

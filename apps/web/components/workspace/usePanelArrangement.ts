@@ -26,7 +26,7 @@ function storageKeyFor(key: string): string {
 function loadStored(key: string): StoredArrangement | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(storageKeyFor(key));
+    const raw = window.sessionStorage.getItem(storageKeyFor(key));
     return raw ? (JSON.parse(raw) as StoredArrangement) : null;
   } catch {
     return null;
@@ -135,7 +135,7 @@ export function usePanelArrangement(plan: VizPlan | null, storageKey: string) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(storageKeyFor(storageKey), JSON.stringify({ panels } satisfies StoredArrangement));
+    window.sessionStorage.setItem(storageKeyFor(storageKey), JSON.stringify({ panels } satisfies StoredArrangement));
   }, [panels, storageKey]);
 
   const addPanel = (type: PanelType) => {
